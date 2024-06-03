@@ -1,0 +1,13 @@
+{
+	"MeshModelList":
+	[
+		{
+			"MeshFileName":"demo_asset_data/lion3.lskelmesh",
+			"SkeletonFileName":"demo_asset_data/lion3.lskeleton",
+			"AnimationFileList":
+			[
+				"demo_asset_data/lion3.lskelanimclip"
+			]
+		}
+	]
+}
