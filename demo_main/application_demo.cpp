@@ -150,8 +150,8 @@ void AnimationSimulateDemo::DrawDemoData()
     viewBindPoint.insert({ 0, viewBufferGpu.mDescriptorOffsetCBV });
     g_pd3dCommandList->SetGraphicsRootSignature(GpuResourceUtil::globelDrawInputRootParam.Get());
     baseSkyBox.Draw(viewBindPoint);
-    std::unordered_map<size_t, size_t> skyBindPoint = viewBindPoint;
-    skyBindPoint.insert({ 3,skySpecularDescriptorOffset });
+    //std::unordered_map<size_t, size_t> skyBindPoint = viewBindPoint;
+    //skyBindPoint.insert({ 3,skySpecularDescriptorOffset });
 
 
 
