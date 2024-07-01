@@ -7,7 +7,7 @@ using json = nlohmann::json;
 void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
 {
     baseSkyBox.CreateOnCmdListOpen();
-    floorMesh.Create("demo_asset_data/floor/floorbox.lmesh");
+    floorMeshRenderer.CreateOnCmdListOpen("demo_asset_data/floor/floorbox.lmesh","demo_asset_data/floor/floor.material");
     //world matrix
     //load model mesh
     json curConfigJson;
@@ -45,7 +45,10 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
     viewBufferCpu.Create(65536);
     viewBufferGpu.mBufferResource->SetName(L"ViewGpuBuffer");
 
-    worldMatrixBufferCpu.Create(65536);
+    for (int32_t i = 0; i < 3; ++i)
+    {
+        worldMatrixBufferCpu[i].Create(65536);
+    }
     worldMatrixBufferGpu.Create(65536,sizeof(DirectX::XMFLOAT4X4));
     worldMatrixBufferGpu.mBufferResource->SetName(L"WorldGpuBuffer");
     //change mesh resource state to vb and ib
@@ -59,9 +62,9 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
 void AnimationSimulateDemo::Create()
 {
     D3D12_SAMPLER_DESC curSampler = {};
-    curSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    curSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-    curSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    curSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    curSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    curSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     curSampler.Filter = D3D12_FILTER::D3D12_FILTER_MIN_MAG_MIP_LINEAR;
     curSampler.MipLODBias = 0;
     curSampler.MaxAnisotropy = 1;
@@ -79,9 +82,10 @@ void AnimationSimulateDemo::Create()
     }
     
     baseSkyBox.Create();    
-    GpuResourceUtil::GenerateGraphicPipelineByShader(GpuResourceUtil::globelDrawInputRootParam.Get(), L"demo_asset_data/shader/draw/static_vertex_trans.hlsl", L"demo_asset_data/shader/draw/pbr_draw.hlsl", true,false, meshDrawPipeline);
-    GpuResourceUtil::GenerateGraphicPipelineByShader(GpuResourceUtil::globelDrawInputRootParam.Get(), L"demo_asset_data/shader/draw/skin_vertex_trans.hlsl", L"demo_asset_data/shader/draw/pbr_draw.hlsl", true,false, skinDrawPipeline);
-
+    GpuResourceUtil::GenerateGraphicPipelineByShader(GpuResourceUtil::globelDrawInputRootParam.Get(), L"demo_asset_data/shader/draw/floor_vertex_trans.hlsl", L"demo_asset_data/shader/draw/pbr_draw.hlsl", true, false, mAllPipelines.floorDrawPipeline);
+    GpuResourceUtil::GenerateGraphicPipelineByShader(GpuResourceUtil::globelDrawInputRootParam.Get(), L"demo_asset_data/shader/draw/static_vertex_trans.hlsl", L"demo_asset_data/shader/draw/pbr_draw.hlsl", true,false, mAllPipelines.meshDrawPipeline);
+    GpuResourceUtil::GenerateGraphicPipelineByShader(GpuResourceUtil::globelDrawInputRootParam.Get(), L"demo_asset_data/shader/draw/skin_vertex_trans.hlsl", L"demo_asset_data/shader/draw/pbr_draw.hlsl", true,false, mAllPipelines.skinDrawPipeline);
+    
 }
 struct ViewParam 
 {
@@ -90,7 +94,8 @@ struct ViewParam
     DirectX::XMFLOAT4 cCamPos;
 };
 void AnimationSimulateDemo::DrawDemoData()
-{    
+{
+    floorMeshRenderer.Update(DirectX::XMFLOAT4(0,0,0,1), DirectX::XMFLOAT4(0,0,0,1), DirectX::XMFLOAT4(6000, 1, 6000, 1));
     //reset barrier
     //D3D12_RESOURCE_BARRIER viewBufferResetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(viewBufferGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
     //g_pd3dCommandList->ResourceBarrier(1, &viewBufferResetBarrier);
@@ -105,10 +110,21 @@ void AnimationSimulateDemo::DrawDemoData()
     size_t offset = g_pSwapChain->GetCurrentBackBufferIndex() * alignedSize;
     memcpy(viewBufferCpu.mapPointer + offset,&newParam,sizeof(newParam));
     g_pd3dCommandList->CopyBufferRegion(viewBufferGpu.mBufferResource.Get(), 0, viewBufferCpu.mBufferResource.Get(), offset, alignedSize);
-    //change view uniform buffer state
-    D3D12_RESOURCE_BARRIER viewBufferBarrier = CD3DX12_RESOURCE_BARRIER::Transition(viewBufferGpu.mBufferResource.Get(),D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
-    g_pd3dCommandList->ResourceBarrier(1, &viewBufferBarrier);
 
+    //world matrix
+    std::vector<DirectX::XMFLOAT4X4> worldMatrixArray;
+    worldMatrixArray.push_back(floorMeshRenderer.GetTransForm());
+    memcpy(worldMatrixBufferCpu[g_pSwapChain->GetCurrentBackBufferIndex()].mapPointer, worldMatrixArray.data(), worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4));
+    size_t copySize = SizeAligned2Pow(worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4), 255);
+    g_pd3dCommandList->CopyBufferRegion(worldMatrixBufferGpu.mBufferResource.Get(), 0, worldMatrixBufferCpu[g_pSwapChain->GetCurrentBackBufferIndex()].mBufferResource.Get(), 0, copySize);
+
+    //change view uniform buffer state
+    D3D12_RESOURCE_BARRIER worldViewBufferBarrier[] = 
+    { 
+        CD3DX12_RESOURCE_BARRIER::Transition(worldMatrixBufferGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(viewBufferGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER)
+    };
+    g_pd3dCommandList->ResourceBarrier(2, worldViewBufferBarrier);
     //RenderTarget
     UINT backBufferIdx = g_pSwapChain->GetCurrentBackBufferIndex();
     D3D12_CPU_DESCRIPTOR_HANDLE cpuDsvHandleStart = g_pd3dDsvDescHeap->GetCPUDescriptorHandleForHeapStart();
@@ -148,8 +164,10 @@ void AnimationSimulateDemo::DrawDemoData()
     std::unordered_map<size_t, size_t> viewBindPoint;
     viewBindPoint.insert({ 5, samplerDescriptor });
     viewBindPoint.insert({ 0, viewBufferGpu.mDescriptorOffsetCBV });
+    viewBindPoint.insert({ 1, worldMatrixBufferGpu.mDescriptorOffsetSRV});
     g_pd3dCommandList->SetGraphicsRootSignature(GpuResourceUtil::globelDrawInputRootParam.Get());
     baseSkyBox.Draw(viewBindPoint);
+    floorMeshRenderer.Draw(viewBindPoint, mAllPipelines.floorDrawPipeline.Get(),0);
     //std::unordered_map<size_t, size_t> skyBindPoint = viewBindPoint;
     //skyBindPoint.insert({ 3,skySpecularDescriptorOffset });
 

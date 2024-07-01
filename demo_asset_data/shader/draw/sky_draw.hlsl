@@ -2,7 +2,7 @@
 BaseFragment VSMain(BaseVertex input, uint inst : SV_InstanceID)
 {
     BaseFragment output;	    	
-    output.position = float4(input.position + cCamPos.xyz, 1.0);
+    output.position = float4(input.position*3000 + cCamPos.xyz, 1.0);
     output.position = mul(output.position, cViewMatrix);
     output.position = mul(output.position, cProjectionMatrix);
     output.normal = input.normal;

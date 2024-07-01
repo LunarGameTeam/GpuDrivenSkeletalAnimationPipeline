@@ -50,7 +50,7 @@ namespace GpuResourceUtil
         //view matrix
         ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
         //world matrix
-        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
         //skin matrix
         ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
         //environment texture
@@ -60,13 +60,14 @@ namespace GpuResourceUtil
         //sampler
         ranges[5].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0);                                            // 2 static samplers.
 
-        CD3DX12_ROOT_PARAMETER1 rootParameters[6];
-        rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
-        rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_ALL);
-        rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
+        CD3DX12_ROOT_PARAMETER1 rootParameters[7];
+        rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_VERTEX);
+        rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_VERTEX);
+        rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_VERTEX);
         rootParameters[3].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_PIXEL);
-        rootParameters[4].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_ALL);
-        rootParameters[5].InitAsDescriptorTable(1, &ranges[5], D3D12_SHADER_VISIBILITY_ALL);
+        rootParameters[4].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_PIXEL);
+        rootParameters[5].InitAsDescriptorTable(1, &ranges[5], D3D12_SHADER_VISIBILITY_PIXEL);
+        rootParameters[6].InitAsConstants(4,1,0, D3D12_SHADER_VISIBILITY_VERTEX);
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -210,7 +211,7 @@ namespace GpuResourceUtil
         }
     }
 
-    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh)
+    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset)
     {
         g_pd3dCommandList->SetPipelineState(pipeline);
         for (auto& eachKey : bindPoint)
@@ -220,9 +221,10 @@ namespace GpuResourceUtil
         g_pd3dCommandList->IASetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY::D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         g_pd3dCommandList->IASetVertexBuffers(0,1, &mesh->vbView);
         g_pd3dCommandList->IASetIndexBuffer(&mesh->ibView);
-
-
-        g_pd3dCommandList->DrawIndexedInstanced((UINT)mesh->mSubMesh[0].mIndexData.size(), 1, mesh->mIbOffset, mesh->mVbOffset, 0);
+        DirectX::XMUINT4 data;
+        data.x = globelInstanceOffset;
+        g_pd3dCommandList->SetGraphicsRoot32BitConstants(6,4, &data,0);
+        g_pd3dCommandList->DrawIndexedInstanced((UINT)mesh->mSubMesh[0].mIndexData.size(), 1, 0, 0, 0);
         
     };
 }

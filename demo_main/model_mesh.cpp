@@ -79,10 +79,10 @@ void SimpleStaticMesh::Create(const std::string& meshFile)
     memcpy(g_gpuStageBuffer.mapPointer + stageOffset + bufferSize, mSubMesh[0].mIndexData.data(), indexSize);
     g_pd3dCommandList->CopyBufferRegion(g_gpuSceneIndexBuffer.mBufferResource.Get(), ibOffset, g_gpuStageBuffer.mBufferResource.Get(), stageOffset + bufferSize, indexSize);
 
-    vbView.BufferLocation = g_gpuSceneStaticVertexBuffer.mBufferResource.Get()->GetGPUVirtualAddress();
+    vbView.BufferLocation = g_gpuSceneStaticVertexBuffer.mBufferResource.Get()->GetGPUVirtualAddress() + staticVbOffset;
     vbView.SizeInBytes = bufferSize;
     vbView.StrideInBytes = sizeof(DirectX::XMFLOAT4) * 3;
-    ibView.BufferLocation = g_gpuSceneIndexBuffer.mBufferResource.Get()->GetGPUVirtualAddress();
+    ibView.BufferLocation = g_gpuSceneIndexBuffer.mBufferResource.Get()->GetGPUVirtualAddress() + ibOffset;
     ibView.Format = DXGI_FORMAT::DXGI_FORMAT_R32_UINT;
     ibView.SizeInBytes = indexSize;
 

@@ -23,7 +23,7 @@ namespace GpuResourceUtil
         std::string shaderType
     );
 
-    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh);
+    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset);
 
     void BindDescriptorToPipeline(size_t rootTableId, size_t descriptorOffset);
 
@@ -37,5 +37,13 @@ namespace GpuResourceUtil
         bool cullFront,
         Microsoft::WRL::ComPtr<ID3D12PipelineState>& pipelineOut
     );
+
+    struct GlobelPipelineManager
+    {
+        //pipeline
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> floorDrawPipeline;
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> meshDrawPipeline;
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> skinDrawPipeline;
+    };
 
 };

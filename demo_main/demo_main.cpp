@@ -29,7 +29,7 @@ void UpdateCamera(SimpleCamera *scene_camera, ImGuiIO* user_input)
     if (io.KeysDown[ImGuiKey_W])
     {
     }
-    float move_speed = 0.15f;
+    float move_speed = 0.5* io.DeltaTime;
     if (user_input->KeysDown[ImGuiKey_A])
     {
         scene_camera->WalkRight(-move_speed);
@@ -65,8 +65,8 @@ void UpdateCamera(SimpleCamera *scene_camera, ImGuiIO* user_input)
     if (user_input->MouseDown[1])
     {
        
-        scene_camera->RotationUp(user_input->MouseDelta.x * 0.001f);
-        scene_camera->RotationRight(user_input->MouseDelta.y * 0.001f);
+        scene_camera->RotationUp(user_input->MouseDelta.x * 1.5f * io.DeltaTime);
+        scene_camera->RotationRight(user_input->MouseDelta.y * 1.5f * io.DeltaTime);
     }
 }
 // Main code
@@ -77,7 +77,7 @@ int main(int, char**)
     //ImGui_ImplWin32_EnableDpiAwareness();
     WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"ImGui Example", nullptr };
     ::RegisterClassExW(&wc);
-    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Dear ImGui DirectX12 Example", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Gpu Driven Skeletal Animation", WS_OVERLAPPEDWINDOW, 100, 100, 1280, 800, nullptr, nullptr, wc.hInstance, nullptr);
 
     // Initialize Direct3D
     if (!CreateDeviceD3D(hwnd))
@@ -195,7 +195,6 @@ int main(int, char**)
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
         }
-
         // 3. Show another simple window.
         if (show_another_window)
         {

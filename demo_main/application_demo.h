@@ -23,18 +23,16 @@ class AnimationSimulateDemo
 
     //world matrix
     SimpleReadOnlyBuffer worldMatrixBufferGpu;
-    SimpleBufferStaging worldMatrixBufferCpu;
+    SimpleBufferStaging worldMatrixBufferCpu[3];
     //view buffer
     SimpleUniformBuffer viewBufferGpu;
     SimpleBufferStaging viewBufferCpu;
 
 
-    SimpleStaticMesh floorMesh;
+    SimpleStaticMeshRenderer floorMeshRenderer;
     bool inited = false;
 
-    //pipeline
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> meshDrawPipeline;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> skinDrawPipeline;
+    GpuResourceUtil::GlobelPipelineManager mAllPipelines;
     //depthstencil
     SimpleDepthStencilBuffer mDepthStencil[3];
 public:
