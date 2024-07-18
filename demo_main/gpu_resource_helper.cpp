@@ -202,7 +202,7 @@ namespace GpuResourceUtil
         //shader and inputelement
         ID3DBlob* computeShader = CreateShaderByFile(L"demo_asset_data/shader/animation_simulation/skin_simulation.hlsl", "CSMain", "cs_5_0");
         desc_out.CS = CD3DX12_SHADER_BYTECODE(computeShader);
-        HRESULT hr = g_pd3dDevice->CreateGraphicsPipelineState(&desc_out, IID_PPV_ARGS(&pipelineOut));
+        HRESULT hr = g_pd3dDevice->CreateComputePipelineState(&desc_out, IID_PPV_ARGS(&pipelineOut));
     }
 
 
