@@ -5,6 +5,8 @@ namespace GpuResourceUtil
 {
     extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelDrawInputRootParam;
 
+    extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuSkinInputRootParam;
+
     extern std::shared_ptr<DirectX::ResourceUploadBatch> globelBatch;
 
     void InitGlobelBatch();

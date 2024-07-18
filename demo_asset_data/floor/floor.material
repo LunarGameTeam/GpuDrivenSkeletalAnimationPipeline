@@ -1,0 +1,22 @@
+{
+	"PbrBaseColor":
+	{
+		"hasTexture": true,
+		"Parameter":"demo_asset_data/floor/base_color.dds"
+	},
+	"PbrNormalColor":
+	{
+		"hasTexture": true,
+		"Parameter":"demo_asset_data/floor/normal.dds"
+	},
+	"PbrMetallicColor":
+	{
+		"hasTexture": true,
+		"Parameter":"demo_asset_data/floor/metallic_1.dds"
+	},
+	"PbrRoughnessColor":
+	{
+		"hasTexture": true,
+		"Parameter":"demo_asset_data/floor/roughness.dds"
+	}
+}

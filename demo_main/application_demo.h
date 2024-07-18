@@ -19,7 +19,7 @@ class AnimationSimulateDemo
     //save the vertex skin result
     SimpleReadWriteBuffer skinVertexResult;
 
-    std::vector<SimpleModelMeshData> meshValueList;
+    std::vector<SimpleStaticMeshRenderer> meshValueList;
 
     //world matrix
     SimpleReadOnlyBuffer worldMatrixBufferGpu;

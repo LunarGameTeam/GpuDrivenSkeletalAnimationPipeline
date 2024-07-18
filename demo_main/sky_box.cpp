@@ -77,7 +77,21 @@ void SimpleMaterial::Create(const std::string& mtlName)
 
 void SimpleStaticMeshRenderer::CreateOnCmdListOpen(const std::string& meshName, const std::string& materialName)
 {
-    curMesh.Create(meshName);
+    curMesh = std::make_shared<SimpleStaticMesh>();
+    curMesh->Create(meshName);
+    curMat.Create(materialName);
+}
+
+void  SimpleStaticMeshRenderer::CreateOnCmdListOpen(
+    const std::string& meshFile,
+    const std::string& skeletonFile,
+    const std::vector<std::string>& animationFileList,
+    const std::string& materialName
+)
+{
+    std::shared_ptr<SimpleSkeletalMeshData> skelMesh = std::make_shared<SimpleSkeletalMeshData>();
+    skelMesh->Create(meshFile, skeletonFile, animationFileList);
+    curMesh = skelMesh;
     curMat.Create(materialName);
 }
 
@@ -85,7 +99,7 @@ void SimpleStaticMeshRenderer::Draw(const std::unordered_map<size_t, size_t>& vi
 {
     std::unordered_map<size_t, size_t> matBindPoint = viewBindPoint;
     matBindPoint.insert({ 4,curMat.GetBaseOffset()});
-    GpuResourceUtil::DrawMeshData(curPipeline, matBindPoint, &curMesh, globelInstanceOffset);
+    GpuResourceUtil::DrawMeshData(curPipeline, matBindPoint, curMesh.get(), globelInstanceOffset);
 }
 
 void SimpleStaticMeshRenderer::Update(DirectX::XMFLOAT4 position, DirectX::XMFLOAT4 rotation, DirectX::XMFLOAT4 scale)

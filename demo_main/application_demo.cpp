@@ -28,7 +28,7 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
             std::string curAnimationName = curAnimationList[animIndex];
             animationNameList.push_back(curAnimationName);
         }
-        meshValueList[meshIndex].Create(curMeshName, curSkeletonName, animationNameList);
+        meshValueList[meshIndex].CreateOnCmdListOpen(curMeshName, curSkeletonName, animationNameList, "demo_asset_data/skeletal_mesh_demo/lion3/lion3.material");
         //meshValueList[i].Create();
     }
     //skeletal Input
@@ -65,9 +65,9 @@ void AnimationSimulateDemo::Create()
     curSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     curSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     curSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    curSampler.Filter = D3D12_FILTER::D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    curSampler.Filter = D3D12_FILTER::D3D12_FILTER_ANISOTROPIC;
     curSampler.MipLODBias = 0;
-    curSampler.MaxAnisotropy = 1;
+    curSampler.MaxAnisotropy = 8;
     curSampler.ComparisonFunc = D3D12_COMPARISON_FUNC::D3D12_COMPARISON_FUNC_NEVER;
     for (int32_t i = 0; i < 4; ++i)
     {
@@ -96,6 +96,10 @@ struct ViewParam
 void AnimationSimulateDemo::DrawDemoData()
 {
     floorMeshRenderer.Update(DirectX::XMFLOAT4(0,0,0,1), DirectX::XMFLOAT4(0,0,0,1), DirectX::XMFLOAT4(6000, 1, 6000, 1));
+    for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
+    {
+        meshValueList[skelMeshIndex].Update(DirectX::XMFLOAT4(0, 1, 0, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1));
+    }
     //reset barrier
     //D3D12_RESOURCE_BARRIER viewBufferResetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(viewBufferGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_COPY_DEST);
     //g_pd3dCommandList->ResourceBarrier(1, &viewBufferResetBarrier);
@@ -114,6 +118,10 @@ void AnimationSimulateDemo::DrawDemoData()
     //world matrix
     std::vector<DirectX::XMFLOAT4X4> worldMatrixArray;
     worldMatrixArray.push_back(floorMeshRenderer.GetTransForm());
+    for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
+    {
+        worldMatrixArray.push_back(meshValueList[skelMeshIndex].GetTransForm());
+    }
     memcpy(worldMatrixBufferCpu[g_pSwapChain->GetCurrentBackBufferIndex()].mapPointer, worldMatrixArray.data(), worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4));
     size_t copySize = SizeAligned2Pow(worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4), 255);
     g_pd3dCommandList->CopyBufferRegion(worldMatrixBufferGpu.mBufferResource.Get(), 0, worldMatrixBufferCpu[g_pSwapChain->GetCurrentBackBufferIndex()].mBufferResource.Get(), 0, copySize);
@@ -168,6 +176,11 @@ void AnimationSimulateDemo::DrawDemoData()
     g_pd3dCommandList->SetGraphicsRootSignature(GpuResourceUtil::globelDrawInputRootParam.Get());
     baseSkyBox.Draw(viewBindPoint);
     floorMeshRenderer.Draw(viewBindPoint, mAllPipelines.floorDrawPipeline.Get(),0);
+    for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
+    {
+        meshValueList[skelMeshIndex].Draw(viewBindPoint, mAllPipelines.meshDrawPipeline.Get(), skelMeshIndex + 1);
+    }
+  
     //std::unordered_map<size_t, size_t> skyBindPoint = viewBindPoint;
     //skyBindPoint.insert({ 3,skySpecularDescriptorOffset });
 

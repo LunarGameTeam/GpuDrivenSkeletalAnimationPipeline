@@ -1,8 +1,8 @@
 ﻿#pragma once
 #include "skeletal_animation.h"
 extern SimpleBufferStaging g_gpuStageBuffer;
-extern SimpleBuffer g_gpuSceneStaticVertexBuffer;
-extern SimpleBuffer g_gpuSceneSkinVertexBuffer;
+extern SimpleReadOnlyBuffer g_gpuSceneStaticVertexBuffer;
+extern SimpleReadOnlyBuffer g_gpuSceneSkinVertexBuffer;
 extern SimpleBuffer g_gpuSceneIndexBuffer;
 extern size_t stageOffset;
 extern size_t staticVbOffset;
@@ -44,8 +44,24 @@ public:
     D3D12_INDEX_BUFFER_VIEW ibView;
 public:
     void Create(const std::string& meshFile);
+protected:
+    virtual void GenerateSubmesh(SimpleSubMesh& curSubmesh,size_t submeshVertexSize, size_t submeshIndexSize);
+    virtual void ReadVertexData(size_t idx, const byte*& ptr);
+};
+
+class SimpleSkeletalMeshData : public SimpleStaticMesh
+{
+    SimpleSkeletonData mSkeleton;
+    std::vector<SimpleAnimationData> mAnimationList;
+public:
+    void Create(
+        const std::string& meshFile,
+        const std::string& skeletonFile,
+        const std::vector<std::string>& animationFileList
+    );
 private:
-    void ReadVertexData(size_t idx, const byte*& ptr);
+    void ReadVertexData(size_t idx, const byte*& ptr) override;
+    void GenerateSubmesh(SimpleSubMesh& curSubmesh, size_t submeshVertexSize, size_t submeshIndexSize) override;
 };
 
 class SimpleModelMeshData

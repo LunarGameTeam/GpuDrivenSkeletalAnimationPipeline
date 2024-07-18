@@ -3,6 +3,7 @@
 namespace GpuResourceUtil
 {
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globelDrawInputRootParam = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuSkinInputRootParam = nullptr;
     std::shared_ptr<DirectX::ResourceUploadBatch> globelBatch = nullptr;
     void InitGlobelBatch()
     {
@@ -165,6 +166,45 @@ namespace GpuResourceUtil
         }
         HRESULT hr = g_pd3dDevice->CreateGraphicsPipelineState(&desc_out, IID_PPV_ARGS(&pipelineOut));
     }
+
+    void GenerateGpuSkinRootSignature()
+    {
+        CD3DX12_DESCRIPTOR_RANGE1 ranges[6];
+        //cbuffer
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        //skeletal animation buffer
+        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        //vertex buffer
+        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        //skin buffer
+        ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        //result buffer
+        ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+
+        CD3DX12_ROOT_PARAMETER1 rootParameters[5];
+        rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
+        rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_ALL);
+        rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
+        rootParameters[3].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_ALL);
+        rootParameters[4].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_ALL);
+        CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+        rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        ID3DBlob* signature;
+        ID3DBlob* error;
+        D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error);
+        HRESULT hr = g_pd3dDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&globelGpuSkinInputRootParam));
+    }
+    void GenerateGpuSkinPipeline(Microsoft::WRL::ComPtr<ID3D12PipelineState>& pipelineOut)
+    {
+        D3D12_COMPUTE_PIPELINE_STATE_DESC desc_out = {};
+        desc_out.pRootSignature = globelGpuSkinInputRootParam.Get();
+        //shader and inputelement
+        ID3DBlob* computeShader = CreateShaderByFile(L"demo_asset_data/shader/animation_simulation/skin_simulation.hlsl", "CSMain", "cs_5_0");
+        desc_out.CS = CD3DX12_SHADER_BYTECODE(computeShader);
+        HRESULT hr = g_pd3dDevice->CreateGraphicsPipelineState(&desc_out, IID_PPV_ARGS(&pipelineOut));
+    }
+
 
     void GenerateTexture2DSRV(
         std::wstring filename,
