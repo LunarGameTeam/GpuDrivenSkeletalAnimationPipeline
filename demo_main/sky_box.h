@@ -55,4 +55,5 @@ public:
     void Draw(const std::unordered_map<size_t, size_t>& viewBindPoint, ID3D12PipelineState* curPipeline, UINT globelInstanceOffset);
     void Update(DirectX::XMFLOAT4 position, DirectX::XMFLOAT4 rotation, DirectX::XMFLOAT4 scale);
     const DirectX::XMFLOAT4X4& GetTransForm() { return transformMatrix; };
+    SimpleStaticMesh* GetCurrentMesh() { return curMesh.get(); };
 };

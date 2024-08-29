@@ -87,6 +87,8 @@ int main(int, char**)
         return 1;
     }
     GpuResourceUtil::GenerateGraphRootSignature();
+    GpuResourceUtil::GenerateGpuSkinRootSignature();
+    GpuResourceUtil::GenerateComputeShaderIndirectArgument(4,GpuResourceUtil::globelGpuSkinInputRootParam.Get(), GpuResourceUtil::skinPassIndirectSignature);
     GpuResourceUtil::InitGlobelBatch();
     InitGpuSceneMeshBuffer();
     

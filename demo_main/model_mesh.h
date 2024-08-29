@@ -6,8 +6,10 @@ extern SimpleReadOnlyBuffer g_gpuSceneSkinVertexBuffer;
 extern SimpleBuffer g_gpuSceneIndexBuffer;
 extern size_t stageOffset;
 extern size_t staticVbOffset;
+extern size_t staticVbSizePerElement;
 extern size_t ibOffset;
 extern size_t skinVbOffset;
+extern size_t skinVbSizePerElement;
 void InitGpuSceneMeshBuffer();
 struct BaseVertex
 {
@@ -51,6 +53,8 @@ protected:
 
 class SimpleSkeletalMeshData : public SimpleStaticMesh
 {
+public:
+    size_t mSkinNumOffset;
     SimpleSkeletonData mSkeleton;
     std::vector<SimpleAnimationData> mAnimationList;
 public:
@@ -59,6 +63,7 @@ public:
         const std::string& skeletonFile,
         const std::vector<std::string>& animationFileList
     );
+    SimpleSkeletonData* GetDefaultSkeleton() { return &mSkeleton; };
 private:
     void ReadVertexData(size_t idx, const byte*& ptr) override;
     void GenerateSubmesh(SimpleSubMesh& curSubmesh, size_t submeshVertexSize, size_t submeshIndexSize) override;

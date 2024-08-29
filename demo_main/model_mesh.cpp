@@ -5,8 +5,10 @@ SimpleReadOnlyBuffer g_gpuSceneSkinVertexBuffer;
 SimpleBuffer g_gpuSceneIndexBuffer;
 size_t stageOffset = 0;
 size_t staticVbOffset = 0;
+size_t staticVbSizePerElement = sizeof(DirectX::XMFLOAT4) * 3;
 size_t ibOffset = 0;
 size_t skinVbOffset = 0;
+size_t skinVbSizePerElement = sizeof(DirectX::XMUINT4) * 2;
 void InitGpuSceneMeshBuffer()
 {
     g_gpuStageBuffer.Create(16 * 1024 * 1024);
@@ -32,7 +34,7 @@ void SimpleStaticMesh::GenerateSubmesh(SimpleSubMesh& curSubmesh, size_t submesh
 
 void SimpleStaticMesh::Create(const std::string& meshFile)
 {
-    mVbOffset = staticVbOffset / (sizeof(DirectX::XMFLOAT4) * 3);
+    mVbOffset = staticVbOffset;
     mIbOffset = ibOffset / sizeof(uint32_t);
     std::vector<char> buffer;
     LoadFileToVectorBinary(meshFile, buffer);
@@ -78,14 +80,14 @@ void SimpleStaticMesh::Create(const std::string& meshFile)
         vertexBufferValue.push_back(vec2);
         vertexBufferValue.push_back(vec3);
     }
-    uint32_t bufferSize = mSubMesh[0].mVertexData.size() * sizeof(DirectX::XMFLOAT4) * 3;
+    uint32_t bufferSize = mSubMesh[0].mVertexData.size() * staticVbSizePerElement;
     uint32_t indexSize = mSubMesh[0].mIndexData.size() * sizeof(uint32_t);
     memcpy(g_gpuStageBuffer.mapPointer + stageOffset, vertexBufferValue.data(), bufferSize);
-    g_pd3dCommandList->CopyBufferRegion(g_gpuSceneStaticVertexBuffer.mBufferResource.Get(), staticVbOffset, g_gpuStageBuffer.mBufferResource.Get(), stageOffset, bufferSize);
+    g_pd3dCommandList->CopyBufferRegion(g_gpuSceneStaticVertexBuffer.mBufferResource.Get(), mVbOffset * staticVbSizePerElement, g_gpuStageBuffer.mBufferResource.Get(), stageOffset, bufferSize);
     memcpy(g_gpuStageBuffer.mapPointer + stageOffset + bufferSize, mSubMesh[0].mIndexData.data(), indexSize);
     g_pd3dCommandList->CopyBufferRegion(g_gpuSceneIndexBuffer.mBufferResource.Get(), ibOffset, g_gpuStageBuffer.mBufferResource.Get(), stageOffset + bufferSize, indexSize);
 
-    vbView.BufferLocation = g_gpuSceneStaticVertexBuffer.mBufferResource.Get()->GetGPUVirtualAddress() + staticVbOffset;
+    vbView.BufferLocation = g_gpuSceneStaticVertexBuffer.mBufferResource.Get()->GetGPUVirtualAddress() + mVbOffset * staticVbSizePerElement;
     vbView.SizeInBytes = bufferSize;
     vbView.StrideInBytes = sizeof(DirectX::XMFLOAT4) * 3;
     ibView.BufferLocation = g_gpuSceneIndexBuffer.mBufferResource.Get()->GetGPUVirtualAddress() + ibOffset;
@@ -93,7 +95,7 @@ void SimpleStaticMesh::Create(const std::string& meshFile)
     ibView.SizeInBytes = indexSize;
 
     stageOffset += bufferSize + indexSize;
-    staticVbOffset += bufferSize;
+    staticVbOffset += mSubMesh[0].mVertexData.size();
     ibOffset += indexSize;
 }
 
@@ -108,6 +110,30 @@ void SimpleSkeletalMeshData::Create(
     {
         mSubMesh[id].mSkinData.resize(mSubMesh[id].mVertexData.size());
     }
+    mSkinNumOffset = skinVbOffset;
+    std::vector<DirectX::XMUINT4> skinBufferValue;
+    for (size_t vi = 0; vi < mSubMesh[0].mSkinData.size(); ++vi)
+    {
+        DirectX::XMUINT4 vec1, vec2;
+        vec1.x = mSubMesh[0].mSkinData[vi].mRefBone[0];
+        vec1.y = mSubMesh[0].mSkinData[vi].mRefBone[1];
+        vec1.z = mSubMesh[0].mSkinData[vi].mRefBone[2];
+        vec1.w = mSubMesh[0].mSkinData[vi].mRefBone[3];
+
+        vec2.x = mSubMesh[0].mSkinData[vi].mWeight[0];
+        vec2.y = mSubMesh[0].mSkinData[vi].mWeight[1];
+        vec2.z = mSubMesh[0].mSkinData[vi].mWeight[2];
+        vec2.w = mSubMesh[0].mSkinData[vi].mWeight[3];
+        skinBufferValue.push_back(vec1);
+        skinBufferValue.push_back(vec2);
+    }
+    uint32_t bufferSize = skinBufferValue.size() * sizeof(DirectX::XMUINT4);
+    memcpy(g_gpuStageBuffer.mapPointer + stageOffset, skinBufferValue.data(), bufferSize);
+    g_pd3dCommandList->CopyBufferRegion(g_gpuSceneSkinVertexBuffer.mBufferResource.Get(), skinVbOffset * skinVbSizePerElement, g_gpuStageBuffer.mBufferResource.Get(), stageOffset, bufferSize);
+    stageOffset += bufferSize;
+    skinVbOffset += mSubMesh[0].mSkinData.size();
+
+
     mSkeleton.Create(skeletonFile);
     mAnimationList.resize(animationFileList.size());
     for (int32_t i = 0; i < animationFileList.size(); ++i)
@@ -145,29 +171,12 @@ void SimpleSkeletalMeshData::ReadVertexData(size_t idx, const byte*& ptr)
     }
     subMeshData.mRefBonePose.resize(refBoneNumber);
     memcpy(subMeshData.mRefBonePose.data(), ptr, refBoneNumber * sizeof(DirectX::XMFLOAT4X4));
-    ptr += refBoneNumber * sizeof(DirectX::XMFLOAT4X4);
-
-    std::vector<DirectX::XMUINT4> skinBufferValue;
-    for (size_t vi = 0; vi < mSubMesh[0].mSkinData.size(); ++vi)
+    for (int32_t boneIndex = 0; boneIndex < subMeshData.mRefBonePose.size(); ++boneIndex)
     {
-        DirectX::XMUINT4 vec1, vec2;
-        vec1.x = mSubMesh[0].mSkinData[vi].mRefBone[0];
-        vec1.y = mSubMesh[0].mSkinData[vi].mRefBone[1];
-        vec1.z = mSubMesh[0].mSkinData[vi].mRefBone[2];
-        vec1.w = mSubMesh[0].mSkinData[vi].mRefBone[3];
-
-        vec2.x = mSubMesh[0].mSkinData[vi].mWeight[0];
-        vec2.y = mSubMesh[0].mSkinData[vi].mWeight[1];
-        vec2.z = mSubMesh[0].mSkinData[vi].mWeight[2];
-        vec2.w = mSubMesh[0].mSkinData[vi].mWeight[3];
-        skinBufferValue.push_back(vec1);
-        skinBufferValue.push_back(vec2);
+        DirectX::XMMATRIX curMat = DirectX::XMLoadFloat4x4(&subMeshData.mRefBonePose[boneIndex]);
+        DirectX::XMStoreFloat4x4(&subMeshData.mRefBonePose[boneIndex],DirectX::XMMatrixTranspose(curMat));
     }
-    uint32_t bufferSize = skinBufferValue.size() * sizeof(DirectX::XMUINT4);
-    memcpy(g_gpuStageBuffer.mapPointer + stageOffset, skinBufferValue.data(), bufferSize);
-    g_pd3dCommandList->CopyBufferRegion(g_gpuSceneSkinVertexBuffer.mBufferResource.Get(), skinVbOffset, g_gpuStageBuffer.mBufferResource.Get(), stageOffset, bufferSize);
-    stageOffset += bufferSize;
-    skinVbOffset += bufferSize;
+    ptr += refBoneNumber * sizeof(DirectX::XMFLOAT4X4);
 }
 
 

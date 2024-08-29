@@ -20,7 +20,7 @@ cbuffer ViewBuffer : register(b0)
 	float4 cCamPos;
 };
 StructuredBuffer<float4x4> RoWorldMatrixDataBuffer : register(t0);
-StructuredBuffer<float4x4> SkinMatrixBuffer : register(t1);
+StructuredBuffer<float4>   SkinResultVertex : register(t1);
 TextureCube _SkyTex : register(t2);
 TextureCube _SkyDiffuseTex : register(t3);
 Texture2D   _brdfTex : register(t4);

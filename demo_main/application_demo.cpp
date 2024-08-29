@@ -36,18 +36,22 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
     bindposeMatrixInput.Create(262144, sizeof(DirectX::XMFLOAT4X4));
     skeletonHierarchyInput.Create(262144, sizeof(UINT32));
 
-    SkeletonAnimationResult.Create(262144, sizeof(DirectX::XMFLOAT4X4));
+    SkeletonAnimationResultGpu.Create(262144, sizeof(DirectX::XMFLOAT4X4));
     worldSpaceSkeletonResultMap0.Create(262144,sizeof(DirectX::XMFLOAT4X4));
     worldSpaceSkeletonResultMap1.Create(262144, sizeof(DirectX::XMFLOAT4X4));
     skinVertexResult.Create(262144, sizeof(DirectX::XMFLOAT4));
+    //skin pass arg buffer
+    skinIndirectArgBufferGpu.Create(262144, sizeof(DirectX::XMFLOAT4X4));
+
     //world & view
     viewBufferGpu.Create(65536);
-    viewBufferCpu.Create(65536);
     viewBufferGpu.mBufferResource->SetName(L"ViewGpuBuffer");
-
     for (int32_t i = 0; i < 3; ++i)
     {
         worldMatrixBufferCpu[i].Create(65536);
+        viewBufferCpu[i].Create(65536);
+        SkeletonAnimationResultCpu[i].Create(262144);
+        skinIndirectArgBufferCpu[i].Create(262144);
     }
     worldMatrixBufferGpu.Create(65536,sizeof(DirectX::XMFLOAT4X4));
     worldMatrixBufferGpu.mBufferResource->SetName(L"WorldGpuBuffer");
@@ -85,6 +89,7 @@ void AnimationSimulateDemo::Create()
     GpuResourceUtil::GenerateGraphicPipelineByShader(GpuResourceUtil::globelDrawInputRootParam.Get(), L"demo_asset_data/shader/draw/floor_vertex_trans.hlsl", L"demo_asset_data/shader/draw/pbr_draw.hlsl", true, false, mAllPipelines.floorDrawPipeline);
     GpuResourceUtil::GenerateGraphicPipelineByShader(GpuResourceUtil::globelDrawInputRootParam.Get(), L"demo_asset_data/shader/draw/static_vertex_trans.hlsl", L"demo_asset_data/shader/draw/pbr_draw.hlsl", true,false, mAllPipelines.meshDrawPipeline);
     GpuResourceUtil::GenerateGraphicPipelineByShader(GpuResourceUtil::globelDrawInputRootParam.Get(), L"demo_asset_data/shader/draw/skin_vertex_trans.hlsl", L"demo_asset_data/shader/draw/pbr_draw.hlsl", true,false, mAllPipelines.skinDrawPipeline);
+    GpuResourceUtil::GenerateGpuSkinPipeline(mAllPipelines.GpuSkinDispatchPipeline);
     
 }
 struct ViewParam 
@@ -93,8 +98,89 @@ struct ViewParam
     DirectX::XMFLOAT4X4 cProjectionMatrix;
     DirectX::XMFLOAT4 cCamPos;
 };
+
+void AnimationSimulateDemo::LocalPoseToModelPose(const std::vector<SimpleSkeletonJoint>& localPose, std::vector<DirectX::XMFLOAT4X4>& modelPose)
+{
+    for (int32_t jointIndex = 0; jointIndex < localPose.size(); ++jointIndex)
+    {
+        const SimpleSkeletonJoint& jointData = localPose[jointIndex];
+        DirectX::XMVECTOR rotationQ = DirectX::XMLoadFloat4(&jointData.mBaseRotation);
+        DirectX::XMMATRIX localMatrix = 
+            DirectX::XMMatrixScaling(jointData.mBaseScal.x, jointData.mBaseScal.y, jointData.mBaseScal.z) *
+            DirectX::XMMatrixRotationQuaternion(rotationQ) *
+            DirectX::XMMatrixTranslation(jointData.mBaseTranslation.x, jointData.mBaseTranslation.y, jointData.mBaseTranslation.z);
+        int32_t parentId = jointData.mParentIndex;
+        DirectX::XMMATRIX parentMatrix = DirectX::XMMatrixIdentity();
+        if (parentId != -1)
+        {
+            parentMatrix = DirectX::XMLoadFloat4x4(&modelPose[parentId]);
+        }
+        DirectX::XMMATRIX finalMatrix = localMatrix * parentMatrix;
+        DirectX::XMStoreFloat4x4(&modelPose[jointIndex], finalMatrix);
+    }
+}
+
+void AnimationSimulateDemo::UpdateResultBufferCpu(uint32_t currentFrameIndex)
+{
+    std::vector<DirectX::XMFLOAT4X4> modelPose;
+    std::vector<DirectX::XMFLOAT4X4> skinResultMatrixArray;
+    std::vector<DirectX::XMFLOAT4> skinVertexCount;
+    for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
+    {
+        SimpleSkeletalMeshData* skelMeshPointer = dynamic_cast<SimpleSkeletalMeshData*>(meshValueList[skelMeshIndex].GetCurrentMesh());
+        SimpleSkeletonData* skeletonData = skelMeshPointer->GetDefaultSkeleton();
+        modelPose.resize(skeletonData->mBoneTree.size());
+        LocalPoseToModelPose(skeletonData->mBoneTree, modelPose);
+        const SimpleSubMesh& curSubMesh = skelMeshPointer->mSubMesh[0];
+        std::unordered_map<int32_t, int32_t> meshIndexToskeleton;
+        for (int32_t bindBoneIndex = 0; bindBoneIndex < curSubMesh.mRefBoneName.size(); ++bindBoneIndex)
+        {
+            auto curItor = skeletonData->mSearchIndex.find(curSubMesh.mRefBoneName[bindBoneIndex]);
+            assert(curItor != skeletonData->mSearchIndex.end());
+            meshIndexToskeleton[bindBoneIndex] = curItor->second;
+        }
+        for (int32_t bindBoneIndex = 0; bindBoneIndex < curSubMesh.mRefBonePose.size(); ++bindBoneIndex)
+        {
+            DirectX::XMMATRIX curBindAnimationPose = DirectX::XMLoadFloat4x4(&modelPose[meshIndexToskeleton[bindBoneIndex]]);
+            DirectX::XMMATRIX curSkinPose = DirectX::XMLoadFloat4x4(&curSubMesh.mRefBonePose[bindBoneIndex]);
+            DirectX::XMFLOAT4X4 finalPose;
+            DirectX::XMStoreFloat4x4(&finalPose, DirectX::XMMatrixTranspose(curSkinPose * curBindAnimationPose));
+            skinResultMatrixArray.push_back(finalPose);
+        }
+        DirectX::XMFLOAT4 skinVertexCount;
+    }
+    //skin matrix
+    memcpy(SkeletonAnimationResultCpu[currentFrameIndex].mapPointer, skinResultMatrixArray.data(), skinResultMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4));
+    size_t copySize = SizeAligned2Pow(skinResultMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4), 255);
+    g_pd3dCommandList->CopyBufferRegion(SkeletonAnimationResultGpu.mBufferResource.Get(), 0, SkeletonAnimationResultCpu[currentFrameIndex].mBufferResource.Get(), 0, copySize);
+
+    //ceshi arg buffer
+    std::vector<GpuResourceUtil::computePassIndirectCommand> allDrawCommand;
+    for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
+    {
+        SimpleSkeletalMeshData* skelMeshPointer = dynamic_cast<SimpleSkeletalMeshData*>(meshValueList[skelMeshIndex].GetCurrentMesh());
+        const SimpleSubMesh& curSubMesh = skelMeshPointer->mSubMesh[0];
+        int32_t verDataCount = curSubMesh.mVertexData.size();
+        int32_t threadCount = verDataCount / 64;
+        if (verDataCount % 64 != 0)
+        {
+            threadCount += 1;
+        }
+        GpuResourceUtil::computePassIndirectCommand newCommand;
+        newCommand.constInput = DirectX::XMUINT4(verDataCount, curSubMesh.mRefBoneName.size(), (uint32_t)skelMeshPointer->mVbOffset, (uint32_t)skelMeshPointer->mSkinNumOffset);
+        newCommand.drawArguments.ThreadGroupCountX = threadCount;
+        newCommand.drawArguments.ThreadGroupCountY = 1;
+        newCommand.drawArguments.ThreadGroupCountZ = 1;
+        allDrawCommand.push_back(newCommand);
+    }
+    memcpy(skinIndirectArgBufferCpu[currentFrameIndex].mapPointer, allDrawCommand.data(), allDrawCommand.size() * sizeof(GpuResourceUtil::computePassIndirectCommand));
+    size_t indirectArgCopySize = SizeAligned2Pow(allDrawCommand.size() * sizeof(GpuResourceUtil::computePassIndirectCommand), 255);
+    g_pd3dCommandList->CopyBufferRegion(skinIndirectArgBufferGpu.mBufferResource.Get(), 0, skinIndirectArgBufferCpu[currentFrameIndex].mBufferResource.Get(), 0, indirectArgCopySize);
+}
+
 void AnimationSimulateDemo::DrawDemoData()
 {
+    uint32_t currentFrameIndex = g_pSwapChain->GetCurrentBackBufferIndex();
     floorMeshRenderer.Update(DirectX::XMFLOAT4(0,0,0,1), DirectX::XMFLOAT4(0,0,0,1), DirectX::XMFLOAT4(6000, 1, 6000, 1));
     for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
     {
@@ -111,9 +197,9 @@ void AnimationSimulateDemo::DrawDemoData()
     DirectX::XMStoreFloat4x4(&newParam.cViewMatrix, matrixView);
     baseView.GetViewPosition(&newParam.cCamPos);
     size_t alignedSize = SizeAligned2Pow(sizeof(newParam), 255);
-    size_t offset = g_pSwapChain->GetCurrentBackBufferIndex() * alignedSize;
-    memcpy(viewBufferCpu.mapPointer + offset,&newParam,sizeof(newParam));
-    g_pd3dCommandList->CopyBufferRegion(viewBufferGpu.mBufferResource.Get(), 0, viewBufferCpu.mBufferResource.Get(), offset, alignedSize);
+    size_t offset = currentFrameIndex * alignedSize;
+    memcpy(viewBufferCpu[currentFrameIndex].mapPointer + offset, &newParam, sizeof(newParam));
+    g_pd3dCommandList->CopyBufferRegion(viewBufferGpu.mBufferResource.Get(), 0, viewBufferCpu[currentFrameIndex].mBufferResource.Get(), offset, alignedSize);
 
     //world matrix
     std::vector<DirectX::XMFLOAT4X4> worldMatrixArray;
@@ -122,17 +208,20 @@ void AnimationSimulateDemo::DrawDemoData()
     {
         worldMatrixArray.push_back(meshValueList[skelMeshIndex].GetTransForm());
     }
-    memcpy(worldMatrixBufferCpu[g_pSwapChain->GetCurrentBackBufferIndex()].mapPointer, worldMatrixArray.data(), worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4));
+    memcpy(worldMatrixBufferCpu[currentFrameIndex].mapPointer, worldMatrixArray.data(), worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4));
     size_t copySize = SizeAligned2Pow(worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4), 255);
-    g_pd3dCommandList->CopyBufferRegion(worldMatrixBufferGpu.mBufferResource.Get(), 0, worldMatrixBufferCpu[g_pSwapChain->GetCurrentBackBufferIndex()].mBufferResource.Get(), 0, copySize);
+    g_pd3dCommandList->CopyBufferRegion(worldMatrixBufferGpu.mBufferResource.Get(), 0, worldMatrixBufferCpu[currentFrameIndex].mBufferResource.Get(), 0, copySize);
 
+
+    UpdateResultBufferCpu(currentFrameIndex);
     //change view uniform buffer state
     D3D12_RESOURCE_BARRIER worldViewBufferBarrier[] = 
     { 
         CD3DX12_RESOURCE_BARRIER::Transition(worldMatrixBufferGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
-        CD3DX12_RESOURCE_BARRIER::Transition(viewBufferGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER)
+        CD3DX12_RESOURCE_BARRIER::Transition(viewBufferGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER),
+        CD3DX12_RESOURCE_BARRIER::Transition(SkeletonAnimationResultGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
     };
-    g_pd3dCommandList->ResourceBarrier(2, worldViewBufferBarrier);
+    g_pd3dCommandList->ResourceBarrier(3, worldViewBufferBarrier);
     //RenderTarget
     UINT backBufferIdx = g_pSwapChain->GetCurrentBackBufferIndex();
     D3D12_CPU_DESCRIPTOR_HANDLE cpuDsvHandleStart = g_pd3dDsvDescHeap->GetCPUDescriptorHandleForHeapStart();
@@ -167,18 +256,48 @@ void AnimationSimulateDemo::DrawDemoData()
         1,
         &render_rect
     );
-
+    //gpuskin
+    D3D12_RESOURCE_BARRIER skeletonSkinBufferBarrier[] =
+    {
+        CD3DX12_RESOURCE_BARRIER::Transition(g_gpuSceneStaticVertexBuffer.mBufferResource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(g_gpuSceneSkinVertexBuffer.mBufferResource.Get(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(skinVertexResult.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
+        CD3DX12_RESOURCE_BARRIER::Transition(skinIndirectArgBufferGpu.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT)
+    };
+    g_pd3dCommandList->ResourceBarrier(4, skeletonSkinBufferBarrier);
+    g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuSkinInputRootParam.Get());
+    GpuResourceUtil::BindDescriptorToPipelineCS(0, SkeletonAnimationResultGpu.mDescriptorOffsetSRV);
+    GpuResourceUtil::BindDescriptorToPipelineCS(1, g_gpuSceneStaticVertexBuffer.mDescriptorOffsetSRV);
+    GpuResourceUtil::BindDescriptorToPipelineCS(2, g_gpuSceneSkinVertexBuffer.mDescriptorOffsetSRV);
+    GpuResourceUtil::BindDescriptorToPipelineCS(3, skinVertexResult.mDescriptorOffsetUAV);
+    g_pd3dCommandList->SetPipelineState(mAllPipelines.GpuSkinDispatchPipeline.Get());
+    g_pd3dCommandList->ExecuteIndirect(
+        GpuResourceUtil::skinPassIndirectSignature.Get(),
+        1,
+        skinIndirectArgBufferGpu.mBufferResource.Get(),
+        0,
+        nullptr,
+        0
+        );
+    D3D12_RESOURCE_BARRIER skeletonSkinBufferReturnBarrier[] =
+    {
+        CD3DX12_RESOURCE_BARRIER::Transition(g_gpuSceneStaticVertexBuffer.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE , D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER),
+        CD3DX12_RESOURCE_BARRIER::Transition(g_gpuSceneSkinVertexBuffer.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER),
+        CD3DX12_RESOURCE_BARRIER::Transition(skinVertexResult.mBufferResource.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+    };
+    g_pd3dCommandList->ResourceBarrier(3, skeletonSkinBufferReturnBarrier);
     //show all mesh
     std::unordered_map<size_t, size_t> viewBindPoint;
     viewBindPoint.insert({ 5, samplerDescriptor });
     viewBindPoint.insert({ 0, viewBufferGpu.mDescriptorOffsetCBV });
     viewBindPoint.insert({ 1, worldMatrixBufferGpu.mDescriptorOffsetSRV});
+    viewBindPoint.insert({ 2, skinVertexResult.mDescriptorOffsetSRV });
     g_pd3dCommandList->SetGraphicsRootSignature(GpuResourceUtil::globelDrawInputRootParam.Get());
     baseSkyBox.Draw(viewBindPoint);
     floorMeshRenderer.Draw(viewBindPoint, mAllPipelines.floorDrawPipeline.Get(),0);
     for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
     {
-        meshValueList[skelMeshIndex].Draw(viewBindPoint, mAllPipelines.meshDrawPipeline.Get(), skelMeshIndex + 1);
+        meshValueList[skelMeshIndex].Draw(viewBindPoint, mAllPipelines.skinDrawPipeline.Get(), skelMeshIndex + 1);
     }
   
     //std::unordered_map<size_t, size_t> skyBindPoint = viewBindPoint;

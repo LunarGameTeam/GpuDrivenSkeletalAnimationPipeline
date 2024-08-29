@@ -12,6 +12,7 @@ struct SimpleSkeletonJoint
 
 class SimpleSkeletonData
 {
+public:
     std::vector<SimpleSkeletonJoint> mBoneTree;
     std::unordered_map<std::string, int32_t> mSearchIndex;
 public:

@@ -4,6 +4,7 @@ namespace GpuResourceUtil
 {
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globelDrawInputRootParam = nullptr;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuSkinInputRootParam = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12CommandSignature> skinPassIndirectSignature = nullptr;
     std::shared_ptr<DirectX::ResourceUploadBatch> globelBatch = nullptr;
     void InitGlobelBatch()
     {
@@ -52,8 +53,8 @@ namespace GpuResourceUtil
         ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
         //world matrix
         ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
-        //skin matrix
-        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        //skin Result
+        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
         //environment texture
         ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 2, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
         //material texture
@@ -170,23 +171,21 @@ namespace GpuResourceUtil
     void GenerateGpuSkinRootSignature()
     {
         CD3DX12_DESCRIPTOR_RANGE1 ranges[6];
-        //cbuffer
-        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
-        //skeletal animation buffer
-        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
+        //SkinMatrixBuffer buffer
+        ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
         //vertex buffer
-        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
         //skin buffer
-        ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
         //result buffer
-        ranges[4].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+        ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
         CD3DX12_ROOT_PARAMETER1 rootParameters[5];
         rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
         rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_ALL);
         rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
         rootParameters[3].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_ALL);
-        rootParameters[4].InitAsDescriptorTable(1, &ranges[4], D3D12_SHADER_VISIBILITY_ALL);
+        rootParameters[4].InitAsConstants(4, 0, 0, D3D12_SHADER_VISIBILITY_ALL);
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -195,6 +194,7 @@ namespace GpuResourceUtil
         D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error);
         HRESULT hr = g_pd3dDevice->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&globelGpuSkinInputRootParam));
     }
+
     void GenerateGpuSkinPipeline(Microsoft::WRL::ComPtr<ID3D12PipelineState>& pipelineOut)
     {
         D3D12_COMPUTE_PIPELINE_STATE_DESC desc_out = {};
@@ -251,6 +251,14 @@ namespace GpuResourceUtil
         }
     }
 
+    void BindDescriptorToPipelineCS(size_t rootTableId, size_t descriptorOffset)
+    {
+        size_t per_descriptor_size = g_pd3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE::D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        D3D12_GPU_DESCRIPTOR_HANDLE gpuHandleStart = g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart();
+        gpuHandleStart.ptr += per_descriptor_size * descriptorOffset;
+        g_pd3dCommandList->SetComputeRootDescriptorTable(rootTableId, gpuHandleStart);
+    }
+
     void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset)
     {
         g_pd3dCommandList->SetPipelineState(pipeline);
@@ -267,4 +275,21 @@ namespace GpuResourceUtil
         g_pd3dCommandList->DrawIndexedInstanced((UINT)mesh->mSubMesh[0].mIndexData.size(), 1, 0, 0, 0);
         
     };
+
+    void GenerateComputeShaderIndirectArgument(UINT constantParamRootIndex, ID3D12RootSignature* rootSignatureIn, Microsoft::WRL::ComPtr<ID3D12CommandSignature>& m_commandSignature)
+    {
+        D3D12_INDIRECT_ARGUMENT_DESC argumentDescs[2] = {};
+        argumentDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+        argumentDescs[0].Constant.DestOffsetIn32BitValues = 0;
+        argumentDescs[0].Constant.Num32BitValuesToSet = 4;
+        argumentDescs[0].Constant.RootParameterIndex = constantParamRootIndex;
+        argumentDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+
+        D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
+        commandSignatureDesc.pArgumentDescs = argumentDescs;
+        commandSignatureDesc.NumArgumentDescs = _countof(argumentDescs);
+        commandSignatureDesc.ByteStride = sizeof(computePassIndirectCommand);
+
+        g_pd3dDevice->CreateCommandSignature(&commandSignatureDesc, rootSignatureIn, IID_PPV_ARGS(&m_commandSignature));
+    }
 }
