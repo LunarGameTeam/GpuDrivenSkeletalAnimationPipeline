@@ -64,6 +64,7 @@ public:
         const std::vector<std::string>& animationFileList
     );
     SimpleSkeletonData* GetDefaultSkeleton() { return &mSkeleton; };
+    SimpleAnimationData* GetAnimationByIndex(int32_t id) { return &mAnimationList[id]; };
 private:
     void ReadVertexData(size_t idx, const byte*& ptr) override;
     void GenerateSubmesh(SimpleSubMesh& curSubmesh, size_t submeshVertexSize, size_t submeshIndexSize) override;

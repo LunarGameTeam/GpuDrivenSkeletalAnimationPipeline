@@ -101,14 +101,3 @@ void SimpleStaticMeshRenderer::Draw(const std::unordered_map<size_t, size_t>& vi
     matBindPoint.insert({ 4,curMat.GetBaseOffset()});
     GpuResourceUtil::DrawMeshData(curPipeline, matBindPoint, curMesh.get(), globelInstanceOffset);
 }
-
-void SimpleStaticMeshRenderer::Update(DirectX::XMFLOAT4 position, DirectX::XMFLOAT4 rotation, DirectX::XMFLOAT4 scale)
-{
-    DirectX::XMVECTOR quatIdentity = DirectX::XMQuaternionIdentity();
-    DirectX::XMVECTOR positionVec, scaleVec;
-    positionVec = DirectX::XMLoadFloat4(&position);
-    scaleVec = DirectX::XMLoadFloat4(&scale);
-    DirectX::XMMATRIX matOut;
-    matOut = DirectX::XMMatrixAffineTransformation(scaleVec, quatIdentity, quatIdentity, positionVec);
-    DirectX::XMStoreFloat4x4(&transformMatrix, DirectX::XMMatrixTranspose(matOut));
-}

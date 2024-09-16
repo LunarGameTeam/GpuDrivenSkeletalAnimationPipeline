@@ -34,6 +34,7 @@ struct AnimClickTrackData
 
 class SimpleAnimationData
 {
+public:
     SimpleAnimLerpType mLerpType;
 
     uint32_t      mFramePerSec;

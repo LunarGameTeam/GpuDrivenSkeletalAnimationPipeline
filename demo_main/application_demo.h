@@ -1,6 +1,53 @@
 ﻿#pragma once
 #include"sky_box.h"
 #include"gpu_resource_helper.h"
+
+struct MeshRenderParameter
+{
+    DirectX::XMFLOAT4X4 mTransformMatrix;
+    int32_t mAnimationindex = 0;
+    float curPlayTime = 0.0f;
+};
+
+class SkeletalMeshRenderBatch
+{
+    SimpleStaticMeshRenderer mRenderer;
+
+    SimpleSkeletalMeshData* mSkeletalMeshPointer;
+
+    std::vector<MeshRenderParameter> mAllInstance;
+
+    size_t mInstaceDataOffset = 0;
+public:
+    void CreateOnCmdListOpen(
+        const std::string& meshFile,
+        const std::string& skeletonFile,
+        const std::vector<std::string>& animationFileList,
+        const std::string& materialName
+    );
+
+    void UpdateSkinValue(
+        size_t& globelSkinMatrixNum,
+        size_t& globelIndirectArgNum,
+        SimpleBufferStaging& SkeletonAnimationResultCpu,
+        SimpleBufferStaging& skinIndirectArgBufferCpu,
+        float delta_time
+    );
+
+    void UpdateInstanceOffset(std::vector<DirectX::XMFLOAT4X4>& worldMatrixArray);
+
+    void Draw(const std::unordered_map<size_t, size_t>& allBindPoint, ID3D12PipelineState* curPipeline);
+
+    void AddInstance(
+        DirectX::XMFLOAT4X4 transformMatrix,
+        int32_t animationindex
+    );
+private:
+
+    void LocalPoseToModelPose(const std::vector<SimpleSkeletonJoint>& localPose, std::vector<DirectX::XMMATRIX>& modelPose);
+};
+
+
 class AnimationSimulateDemo
 {
     size_t samplerDescriptor;
@@ -22,7 +69,7 @@ class AnimationSimulateDemo
     //save the vertex skin result
     SimpleReadWriteBuffer skinVertexResult;
 
-    std::vector<SimpleStaticMeshRenderer> meshValueList;
+    std::vector<SkeletalMeshRenderBatch> meshValueList;
 
     //world matrix
     SimpleReadOnlyBuffer worldMatrixBufferGpu;
@@ -43,9 +90,11 @@ public:
     SimpleCamera* GetCamera() { return &baseView; }
     void Create();
     void CreateOnCmdListOpen(const std::string& configFile);
-    void UpdateResultBufferCpu(uint32_t currentFrameIndex);
+    void UpdateSkeletalMeshBatch(std::vector<DirectX::XMFLOAT4X4>& worldMatrixArray, uint32_t currentFrameIndex, float delta_time);
     void LocalPoseToModelPose(const std::vector<SimpleSkeletonJoint>& localPose, std::vector<DirectX::XMFLOAT4X4>& modelPose);
     void BindSkinBuffer();
     bool Inited() { return inited; }
-    void DrawDemoData();
+    void DrawDemoData(float delta_time);
+private:
+    void UpdateResultBufferCpu(uint32_t currentFrameIndex, float delta_time);
 };

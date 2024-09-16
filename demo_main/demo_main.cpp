@@ -237,7 +237,7 @@ int main(int, char**)
         const float clear_color_with_alpha[4] = { clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w };
         g_pd3dCommandList->ClearRenderTargetView(g_mainGUIRenderTargetDescriptor[backBufferIdx], clear_color_with_alpha, 0, nullptr);
 
-        mDemo->DrawDemoData();
+        mDemo->DrawDemoData(io.DeltaTime);
 
         
 
