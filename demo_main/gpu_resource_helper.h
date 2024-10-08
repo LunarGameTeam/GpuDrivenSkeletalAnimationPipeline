@@ -28,7 +28,7 @@ namespace GpuResourceUtil
         std::string shaderType
     );
 
-    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset, UINT instanceCount);
+    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelVertexOffset, UINT globelInstanceOffset, UINT instanceCount);
 
     void BindDescriptorToPipeline(size_t rootTableId, size_t descriptorOffset);
 
@@ -59,9 +59,15 @@ namespace GpuResourceUtil
     };
     struct computePassIndirectCommand
     {
-        DirectX::XMUINT4 constInput;
+        DirectX::XMUINT4 constInput1;
+        DirectX::XMUINT4 constInput2;
         D3D12_DISPATCH_ARGUMENTS drawArguments;
     };
-    void GenerateComputeShaderIndirectArgument(UINT constantParamRootIndex,ID3D12RootSignature* rootSignatureIn,Microsoft::WRL::ComPtr<ID3D12CommandSignature>& m_commandSignature);
+    void GenerateComputeShaderIndirectArgument(
+        UINT constantLocalCountParamRootIndex,
+        UINT constantGlobelCountParamRootIndex,
+        ID3D12RootSignature* rootSignatureIn,
+        Microsoft::WRL::ComPtr<ID3D12CommandSignature>& m_commandSignature
+    );
 
 };

@@ -54,6 +54,7 @@ public:
     void Draw(
         const std::unordered_map<size_t, size_t>& viewBindPoint,
         ID3D12PipelineState* curPipeline,
+        UINT globelVertexOffset,
         UINT globelInstanceOffset,
         UINT instanceCount
     );

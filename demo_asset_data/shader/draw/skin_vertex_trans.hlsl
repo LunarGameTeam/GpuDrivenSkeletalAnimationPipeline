@@ -3,7 +3,7 @@ BaseFragment VSMain(BaseVertex input, uint instanceID : SV_InstanceID,uint vertI
 {
    BaseFragment output;
    BaseVertex newVert = input;
-   uint globelSkinOffset = instanceID * worldInstanceOffset.y * 3;
+   uint globelSkinOffset = (worldInstanceOffset.z + instanceID * worldInstanceOffset.y) * 3;
    uint skinOffset = globelSkinOffset + vertId * 3;
    float4 value1 = SkinResultVertex[skinOffset];
    float4 value2 = SkinResultVertex[skinOffset + 1];

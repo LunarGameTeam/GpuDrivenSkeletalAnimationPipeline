@@ -180,12 +180,13 @@ namespace GpuResourceUtil
         //result buffer
         ranges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
 
-        CD3DX12_ROOT_PARAMETER1 rootParameters[5];
+        CD3DX12_ROOT_PARAMETER1 rootParameters[6];
         rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
         rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_ALL);
         rootParameters[2].InitAsDescriptorTable(1, &ranges[2], D3D12_SHADER_VISIBILITY_ALL);
         rootParameters[3].InitAsDescriptorTable(1, &ranges[3], D3D12_SHADER_VISIBILITY_ALL);
         rootParameters[4].InitAsConstants(4, 0, 0, D3D12_SHADER_VISIBILITY_ALL);
+        rootParameters[5].InitAsConstants(4, 1, 0, D3D12_SHADER_VISIBILITY_ALL);
         CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
         rootSignatureDesc.Init_1_1(_countof(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
@@ -259,7 +260,7 @@ namespace GpuResourceUtil
         g_pd3dCommandList->SetComputeRootDescriptorTable(rootTableId, gpuHandleStart);
     }
 
-    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset, UINT instanceCount)
+    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelVertexOffset, UINT globelInstanceOffset, UINT instanceCount)
     {
         g_pd3dCommandList->SetPipelineState(pipeline);
         for (auto& eachKey : bindPoint)
@@ -272,19 +273,31 @@ namespace GpuResourceUtil
         DirectX::XMUINT4 data;
         data.x = globelInstanceOffset;
         data.y = (UINT)mesh->mSubMesh[0].mVertexData.size();
+        data.z = globelVertexOffset;
         g_pd3dCommandList->SetGraphicsRoot32BitConstants(6,4, &data,0);
         g_pd3dCommandList->DrawIndexedInstanced((UINT)mesh->mSubMesh[0].mIndexData.size(), instanceCount, 0, 0, 0);
         
     };
 
-    void GenerateComputeShaderIndirectArgument(UINT constantParamRootIndex, ID3D12RootSignature* rootSignatureIn, Microsoft::WRL::ComPtr<ID3D12CommandSignature>& m_commandSignature)
+    void GenerateComputeShaderIndirectArgument(
+        UINT constantLocalCountParamRootIndex,
+        UINT constantGlobelCountParamRootIndex,
+        ID3D12RootSignature* rootSignatureIn,
+        Microsoft::WRL::ComPtr<ID3D12CommandSignature>& m_commandSignature
+    )
     {
-        D3D12_INDIRECT_ARGUMENT_DESC argumentDescs[2] = {};
+        D3D12_INDIRECT_ARGUMENT_DESC argumentDescs[3] = {};
         argumentDescs[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
         argumentDescs[0].Constant.DestOffsetIn32BitValues = 0;
         argumentDescs[0].Constant.Num32BitValuesToSet = 4;
-        argumentDescs[0].Constant.RootParameterIndex = constantParamRootIndex;
-        argumentDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+        argumentDescs[0].Constant.RootParameterIndex = constantLocalCountParamRootIndex;
+
+        argumentDescs[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_CONSTANT;
+        argumentDescs[1].Constant.DestOffsetIn32BitValues = 0;
+        argumentDescs[1].Constant.Num32BitValuesToSet = 4;
+        argumentDescs[1].Constant.RootParameterIndex = constantGlobelCountParamRootIndex;
+
+        argumentDescs[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
 
         D3D12_COMMAND_SIGNATURE_DESC commandSignatureDesc = {};
         commandSignatureDesc.pArgumentDescs = argumentDescs;

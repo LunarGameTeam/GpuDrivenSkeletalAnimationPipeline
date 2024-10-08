@@ -1,6 +1,10 @@
-cbuffer mInstanceOffset
+cbuffer mInstanceOffset : register(b0)
 {
 	uint4 VertexSkeletonCount;
+}
+cbuffer mInstanceOffset : register(b1)
+{
+	uint4 VertexSkeletonOffset;
 }
 
 StructuredBuffer<float4x4> SkinMatrixBuffer : register(t0);
@@ -51,7 +55,7 @@ void TransformSkinVertex(
 	float4 weight1
 )
 {
-	uint globelSkeletonOffset = instanceIndex * VertexSkeletonCount.y;
+	uint globelSkeletonOffset = VertexSkeletonOffset.y + instanceIndex * VertexSkeletonCount.y;
 	uint4 ref0 = ref0In + uint4(globelSkeletonOffset, globelSkeletonOffset, globelSkeletonOffset, globelSkeletonOffset);
 	uint4 ref1 = ref1In + uint4(globelSkeletonOffset, globelSkeletonOffset, globelSkeletonOffset, globelSkeletonOffset);
 
@@ -129,15 +133,15 @@ void CSMain(uint3 threadIndex : SV_DispatchThreadID)
 	normal.yz = value2.xy;
 	tangent.xy = value2.zw;
 	tangent.zw = value3.xy;
+	//GpuSkin
 	TransformSkinVertex(position, normal, tangent, instance_index, blendIndexA, blendIndexB, blendweightA, blendweightB);
-
+	//Write Skin Result
 	value1.xyz = position;
 	value1.w = normal.x;
 	value2.xy = normal.yz;
 	value2.zw = tangent.xy;
 	value3.xy = tangent.zw;
-
-	uint curVertexWriteOffset = (instance_index * vertex_num_per_mesh + vertex_index) * 3;
+	uint curVertexWriteOffset = (VertexSkeletonOffset.x + instance_index * vertex_num_per_mesh + vertex_index) * 3;
 	SkinOutVertex[curVertexWriteOffset] = value1;
 	SkinOutVertex[curVertexWriteOffset + 1] = value2;
 	SkinOutVertex[curVertexWriteOffset + 2] = value3;

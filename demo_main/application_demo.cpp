@@ -51,23 +51,25 @@ void SkeletalMeshRenderBatch::LocalPoseToModelPose(const std::vector<SimpleSkele
 }
 
 void SkeletalMeshRenderBatch::CreateOnCmdListOpen(
+    const int32_t meshIndex,
     const std::string& meshFile,
     const std::string& skeletonFile,
     const std::vector<std::string>& animationFileList,
     const std::string& materialName
 )
 {
-    AddInstance(MatrixCompose(DirectX::XMFLOAT4(0, 1, 0, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1)), 0, 0.0f);
-    AddInstance(MatrixCompose(DirectX::XMFLOAT4(1, 1, 0, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1)), 0, 0.5f);
-    AddInstance(MatrixCompose(DirectX::XMFLOAT4(2, 1, 0, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1)), 0, 0.5f);
-    AddInstance(MatrixCompose(DirectX::XMFLOAT4(3, 1, 0, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1)), 0, 0.5f);
-    AddInstance(MatrixCompose(DirectX::XMFLOAT4(4, 1, 0, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1)), 0, 0.5f);
-    AddInstance(MatrixCompose(DirectX::XMFLOAT4(5, 1, 0, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1)), 0, 0.5f);
+    AddInstance(MatrixCompose(DirectX::XMFLOAT4(0, 1, 2 * meshIndex, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(0.1, 0.1, 0.1, 1)), 0, 0.0f);
+    AddInstance(MatrixCompose(DirectX::XMFLOAT4(1, 1, 2 * meshIndex, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(0.1, 0.1, 0.1, 1)), 0, 0.5f);
+    AddInstance(MatrixCompose(DirectX::XMFLOAT4(2, 1, 2 * meshIndex, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(0.1, 0.1, 0.1, 1)), 0, 1.5f);
+    AddInstance(MatrixCompose(DirectX::XMFLOAT4(3, 1, 2 * meshIndex, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(0.1, 0.1, 0.1, 1)), 0, 0.5f);
+    AddInstance(MatrixCompose(DirectX::XMFLOAT4(4, 1, 2 * meshIndex, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(0.1, 0.1, 0.1, 1)), 0, 0.5f);
+    AddInstance(MatrixCompose(DirectX::XMFLOAT4(5, 1, 2 * meshIndex, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(0.1, 0.1, 0.1, 1)), 0, 0.5f);
     mRenderer.CreateOnCmdListOpen(meshFile, skeletonFile, animationFileList, materialName);
     mSkeletalMeshPointer = dynamic_cast<SimpleSkeletalMeshData*>(mRenderer.GetCurrentMesh());
 }
 
 void SkeletalMeshRenderBatch::UpdateSkinValue(
+    size_t& globelSkinVertNum,
     size_t& globelSkinMatrixNum,
     size_t& globelIndirectArgNum,
     SimpleBufferStaging& SkeletonAnimationResultCpu,
@@ -75,6 +77,8 @@ void SkeletalMeshRenderBatch::UpdateSkinValue(
     float delta_time
 )
 {
+    mVertexDataOffset = globelSkinVertNum;
+    size_t curSkinMatrixOffset = globelSkinMatrixNum;
     std::vector<DirectX::XMFLOAT4X4> skinResultMatrixArray;
     std::vector<DirectX::XMMATRIX> curSkinBindPose;
     const SimpleSubMesh& curSubMesh = mSkeletalMeshPointer->mSubMesh[0];
@@ -157,13 +161,17 @@ void SkeletalMeshRenderBatch::UpdateSkinValue(
 
     //ceshi arg buffer
     int32_t verDataCount = curSubMesh.mVertexData.size();
+    globelSkinVertNum += verDataCount * mAllInstance.size();
     int32_t threadCount = verDataCount / 64;
     if (verDataCount % 64 != 0)
     {
         threadCount += 1;
     }
     GpuResourceUtil::computePassIndirectCommand newCommand;
-    newCommand.constInput = DirectX::XMUINT4(verDataCount, curSubMesh.mRefBoneName.size(), (uint32_t)mSkeletalMeshPointer->mVbOffset, (uint32_t)mSkeletalMeshPointer->mSkinNumOffset);
+    newCommand.constInput1 = DirectX::XMUINT4(verDataCount, curSubMesh.mRefBoneName.size(), (uint32_t)mSkeletalMeshPointer->mVbOffset, (uint32_t)mSkeletalMeshPointer->mSkinNumOffset);
+    newCommand.constInput2 = DirectX::XMUINT4(mVertexDataOffset, curSkinMatrixOffset, 0, 0);
+    
+    
     newCommand.drawArguments.ThreadGroupCountX = threadCount;
     newCommand.drawArguments.ThreadGroupCountY = mAllInstance.size();
     newCommand.drawArguments.ThreadGroupCountZ = 1;
@@ -175,7 +183,8 @@ void SkeletalMeshRenderBatch::UpdateSkinValue(
 
 void SkeletalMeshRenderBatch::Draw(const std::unordered_map<size_t, size_t>& allBindPoint, ID3D12PipelineState* curPipeline)
 {
-    mRenderer.Draw(allBindPoint, curPipeline, mInstaceDataOffset, mAllInstance.size());
+    
+    mRenderer.Draw(allBindPoint, curPipeline, mVertexDataOffset,mInstaceDataOffset, mAllInstance.size());
 }
 
 size_t SkeletalMeshRenderBatch::ComputeSkinResultBufferCount()
@@ -217,13 +226,13 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
         std::string curSkeletonName = curMesh["SkeletonFileName"];
         json curAnimationList = curMesh["AnimationFileList"];
         std::vector<std::string> animationNameList;
-        int allAnimationCount = allMeshDataList.size();
+        int allAnimationCount = curAnimationList.size();
         for (int32_t animIndex = 0; animIndex < allAnimationCount; ++animIndex)
         {
             std::string curAnimationName = curAnimationList[animIndex];
             animationNameList.push_back(curAnimationName);
         }
-        meshValueList[meshIndex].CreateOnCmdListOpen(curMeshName, curSkeletonName, animationNameList, "demo_asset_data/skeletal_mesh_demo/lion3/lion3.material");
+        meshValueList[meshIndex].CreateOnCmdListOpen(meshIndex,curMeshName, curSkeletonName, animationNameList, "demo_asset_data/skeletal_mesh_demo/lion3/lion3.material");
         allMeshVertexBufferSize += meshValueList[meshIndex].ComputeSkinResultBufferCount();
         allSkeletalBufferSize += meshValueList[meshIndex].ComputeSkeletalMatrixBufferCount();
         //meshValueList[i].Create();
@@ -248,7 +257,7 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
     {
         worldMatrixBufferCpu[i].Create(65536);
         viewBufferCpu[i].Create(65536);
-        SkeletonAnimationResultCpu[i].Create(262144);
+        SkeletonAnimationResultCpu[i].Create(allSkeletalBufferSize);
         skinIndirectArgBufferCpu[i].Create(262144);
     }
     worldMatrixBufferGpu.Create(65536,sizeof(DirectX::XMFLOAT4X4));
@@ -299,30 +308,33 @@ struct ViewParam
     DirectX::XMFLOAT4 cCamPos;
 };
 
-void AnimationSimulateDemo::UpdateSkeletalMeshBatch(std::vector<DirectX::XMFLOAT4X4> &worldMatrixArray,uint32_t currentFrameIndex,float delta_time)
+void AnimationSimulateDemo::UpdateSkeletalMeshBatch(std::vector<DirectX::XMFLOAT4X4> &worldMatrixArray, uint32_t& indirectSimulationCount, uint32_t currentFrameIndex,float delta_time)
 {
-    UpdateResultBufferCpu(currentFrameIndex,delta_time);
+    UpdateResultBufferCpu(currentFrameIndex,delta_time, indirectSimulationCount);
     for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
     {
+        size_t globelSkinVertNum = 0;
         meshValueList[skelMeshIndex].UpdateInstanceOffset(worldMatrixArray);
     }
 }
 
-void AnimationSimulateDemo::UpdateResultBufferCpu(uint32_t currentFrameIndex,float delta_time)
+void AnimationSimulateDemo::UpdateResultBufferCpu(uint32_t currentFrameIndex,float delta_time, uint32_t& indirectSimulationCount)
 {
+    size_t globelSkinVertNum = 0;
     size_t globelSkinMatrixNum = 0;
     size_t globelIndirectArgNum = 0;
     for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
     {
-        meshValueList[skelMeshIndex].UpdateSkinValue(globelSkinMatrixNum, globelIndirectArgNum, SkeletonAnimationResultCpu[currentFrameIndex], skinIndirectArgBufferCpu[currentFrameIndex], delta_time);
+        meshValueList[skelMeshIndex].UpdateSkinValue(globelSkinVertNum,globelSkinMatrixNum, globelIndirectArgNum, SkeletonAnimationResultCpu[currentFrameIndex], skinIndirectArgBufferCpu[currentFrameIndex], delta_time);
     }
     //skin matrix
     size_t copySize = SizeAligned2Pow(globelSkinMatrixNum * sizeof(DirectX::XMFLOAT4X4), 255);
     g_pd3dCommandList->CopyBufferRegion(SkeletonAnimationResultGpu.mBufferResource.Get(), 0, SkeletonAnimationResultCpu[currentFrameIndex].mBufferResource.Get(), 0, copySize);
 
-    //ceshi arg buffer
+    //test arg buffer
     size_t indirectArgCopySize = SizeAligned2Pow(globelIndirectArgNum * sizeof(GpuResourceUtil::computePassIndirectCommand), 255);
     g_pd3dCommandList->CopyBufferRegion(skinIndirectArgBufferGpu.mBufferResource.Get(), 0, skinIndirectArgBufferCpu[currentFrameIndex].mBufferResource.Get(), 0, indirectArgCopySize);
+    indirectSimulationCount = globelIndirectArgNum;
 }
 
 void AnimationSimulateDemo::DrawDemoData(float delta_time)
@@ -347,7 +359,8 @@ void AnimationSimulateDemo::DrawDemoData(float delta_time)
     std::vector<DirectX::XMFLOAT4X4> worldMatrixArray;
     worldMatrixArray.push_back(MatrixCompose(DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(6000, 1, 6000, 1)));
 
-    UpdateSkeletalMeshBatch(worldMatrixArray, currentFrameIndex, delta_time);
+    uint32_t indirectSimulationCount = 0;
+    UpdateSkeletalMeshBatch(worldMatrixArray, indirectSimulationCount,currentFrameIndex, delta_time);
 
     memcpy(worldMatrixBufferCpu[currentFrameIndex].mapPointer, worldMatrixArray.data(), worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4));
     size_t copySize = SizeAligned2Pow(worldMatrixArray.size() * sizeof(DirectX::XMFLOAT4X4), 255);
@@ -412,7 +425,7 @@ void AnimationSimulateDemo::DrawDemoData(float delta_time)
     g_pd3dCommandList->SetPipelineState(mAllPipelines.GpuSkinDispatchPipeline.Get());
     g_pd3dCommandList->ExecuteIndirect(
         GpuResourceUtil::skinPassIndirectSignature.Get(),
-        1,
+        indirectSimulationCount,
         skinIndirectArgBufferGpu.mBufferResource.Get(),
         0,
         nullptr,
@@ -433,7 +446,7 @@ void AnimationSimulateDemo::DrawDemoData(float delta_time)
     viewBindPoint.insert({ 2, skinVertexResult.mDescriptorOffsetSRV });
     g_pd3dCommandList->SetGraphicsRootSignature(GpuResourceUtil::globelDrawInputRootParam.Get());
     baseSkyBox.Draw(viewBindPoint);
-    floorMeshRenderer.Draw(viewBindPoint, mAllPipelines.floorDrawPipeline.Get(),0,1);
+    floorMeshRenderer.Draw(viewBindPoint, mAllPipelines.floorDrawPipeline.Get(),0,0,1);
     for (int32_t skelMeshIndex = 0; skelMeshIndex < meshValueList.size(); ++skelMeshIndex)
     {
         meshValueList[skelMeshIndex].Draw(viewBindPoint, mAllPipelines.skinDrawPipeline.Get());

@@ -18,8 +18,11 @@ class SkeletalMeshRenderBatch
     std::vector<MeshRenderParameter> mAllInstance;
 
     size_t mInstaceDataOffset = 0;
+
+    size_t mVertexDataOffset = 0;
 public:
     void CreateOnCmdListOpen(
+        const int32_t meshIndex,
         const std::string& meshFile,
         const std::string& skeletonFile,
         const std::vector<std::string>& animationFileList,
@@ -27,6 +30,7 @@ public:
     );
 
     void UpdateSkinValue(
+        size_t& globelSkinVertNum,
         size_t& globelSkinMatrixNum,
         size_t& globelIndirectArgNum,
         SimpleBufferStaging& SkeletonAnimationResultCpu,
@@ -95,9 +99,9 @@ public:
     SimpleCamera* GetCamera() { return &baseView; }
     void Create();
     void CreateOnCmdListOpen(const std::string& configFile);
-    void UpdateSkeletalMeshBatch(std::vector<DirectX::XMFLOAT4X4>& worldMatrixArray, uint32_t currentFrameIndex, float delta_time);
+    void UpdateSkeletalMeshBatch(std::vector<DirectX::XMFLOAT4X4>& worldMatrixArray, uint32_t& indirectSimulationCount,uint32_t currentFrameIndex, float delta_time);
     bool Inited() { return inited; }
     void DrawDemoData(float delta_time);
 private:
-    void UpdateResultBufferCpu(uint32_t currentFrameIndex, float delta_time);
+    void UpdateResultBufferCpu(uint32_t currentFrameIndex, float delta_time, uint32_t& indirectSimulationCount);
 };
