@@ -2,11 +2,11 @@
 	"MeshModelList":
 	[
 		{
-			"MeshFileName":"demo_asset_data/skeletal_mesh_demo/lion3/lion3.lskelmesh",
-			"SkeletonFileName":"demo_asset_data/skeletal_mesh_demo/lion3/lion3.lskeleton",
+			"MeshFileName":"demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelmesh",
+			"SkeletonFileName":"demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskeleton",
 			"AnimationFileList":
 			[
-				"demo_asset_data/skeletal_mesh_demo/lion3/lion3.lskelanimclip"
+				"demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelanimclip"
 			]
 		}
 	]

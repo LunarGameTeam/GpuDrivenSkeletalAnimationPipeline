@@ -51,6 +51,11 @@ public:
         const std::vector<std::string>& animationFileList,
         const std::string& materialName
     );
-    void Draw(const std::unordered_map<size_t, size_t>& viewBindPoint, ID3D12PipelineState* curPipeline, UINT globelInstanceOffset);
+    void Draw(
+        const std::unordered_map<size_t, size_t>& viewBindPoint,
+        ID3D12PipelineState* curPipeline,
+        UINT globelInstanceOffset,
+        UINT instanceCount
+    );
     SimpleStaticMesh* GetCurrentMesh() { return curMesh.get(); };
 };

@@ -40,8 +40,13 @@ public:
 
     void AddInstance(
         DirectX::XMFLOAT4X4 transformMatrix,
-        int32_t animationindex
+        int32_t animationindex,
+        float stTime
     );
+
+    size_t ComputeSkinResultBufferCount();
+
+    size_t ComputeSkeletalMatrixBufferCount();
 private:
 
     void LocalPoseToModelPose(const std::vector<SimpleSkeletonJoint>& localPose, std::vector<DirectX::XMMATRIX>& modelPose);
@@ -91,8 +96,6 @@ public:
     void Create();
     void CreateOnCmdListOpen(const std::string& configFile);
     void UpdateSkeletalMeshBatch(std::vector<DirectX::XMFLOAT4X4>& worldMatrixArray, uint32_t currentFrameIndex, float delta_time);
-    void LocalPoseToModelPose(const std::vector<SimpleSkeletonJoint>& localPose, std::vector<DirectX::XMFLOAT4X4>& modelPose);
-    void BindSkinBuffer();
     bool Inited() { return inited; }
     void DrawDemoData(float delta_time);
 private:

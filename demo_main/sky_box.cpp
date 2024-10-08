@@ -35,7 +35,7 @@ void SimpleSkyBox::Draw(const std::unordered_map<size_t, size_t>& viewBindPoint)
 {
     std::unordered_map<size_t, size_t> skyBindPoint = viewBindPoint;
     GetSkyBindPoint(skyBindPoint);
-    GpuResourceUtil::DrawMeshData(skyPipeline.Get(), skyBindPoint, &skyMesh,0);
+    GpuResourceUtil::DrawMeshData(skyPipeline.Get(), skyBindPoint, &skyMesh,0,1);
 }
 
 void SimpleSkyBox::GetSkyBindPoint(std::unordered_map<size_t, size_t>& bindPoint)
@@ -95,9 +95,14 @@ void  SimpleStaticMeshRenderer::CreateOnCmdListOpen(
     curMat.Create(materialName);
 }
 
-void SimpleStaticMeshRenderer::Draw(const std::unordered_map<size_t, size_t>& viewBindPoint, ID3D12PipelineState* curPipeline, UINT globelInstanceOffset)
+void SimpleStaticMeshRenderer::Draw(
+    const std::unordered_map<size_t, size_t>& viewBindPoint,
+    ID3D12PipelineState* curPipeline,
+    UINT globelInstanceOffset,
+    UINT instanceCount
+)
 {
     std::unordered_map<size_t, size_t> matBindPoint = viewBindPoint;
     matBindPoint.insert({ 4,curMat.GetBaseOffset()});
-    GpuResourceUtil::DrawMeshData(curPipeline, matBindPoint, curMesh.get(), globelInstanceOffset);
+    GpuResourceUtil::DrawMeshData(curPipeline, matBindPoint, curMesh.get(), globelInstanceOffset, instanceCount);
 }

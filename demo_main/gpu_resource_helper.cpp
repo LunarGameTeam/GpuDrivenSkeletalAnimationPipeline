@@ -259,7 +259,7 @@ namespace GpuResourceUtil
         g_pd3dCommandList->SetComputeRootDescriptorTable(rootTableId, gpuHandleStart);
     }
 
-    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset)
+    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset, UINT instanceCount)
     {
         g_pd3dCommandList->SetPipelineState(pipeline);
         for (auto& eachKey : bindPoint)
@@ -271,8 +271,9 @@ namespace GpuResourceUtil
         g_pd3dCommandList->IASetIndexBuffer(&mesh->ibView);
         DirectX::XMUINT4 data;
         data.x = globelInstanceOffset;
+        data.y = (UINT)mesh->mSubMesh[0].mVertexData.size();
         g_pd3dCommandList->SetGraphicsRoot32BitConstants(6,4, &data,0);
-        g_pd3dCommandList->DrawIndexedInstanced((UINT)mesh->mSubMesh[0].mIndexData.size(), 1, 0, 0, 0);
+        g_pd3dCommandList->DrawIndexedInstanced((UINT)mesh->mSubMesh[0].mIndexData.size(), instanceCount, 0, 0, 0);
         
     };
 

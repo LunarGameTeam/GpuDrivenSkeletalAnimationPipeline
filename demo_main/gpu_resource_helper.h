@@ -28,7 +28,7 @@ namespace GpuResourceUtil
         std::string shaderType
     );
 
-    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset);
+    void DrawMeshData(ID3D12PipelineState* pipeline, std::unordered_map<size_t, size_t> bindPoint, SimpleStaticMesh* mesh, UINT globelInstanceOffset, UINT instanceCount);
 
     void BindDescriptorToPipeline(size_t rootTableId, size_t descriptorOffset);
 
