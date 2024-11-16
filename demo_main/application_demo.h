@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include"sky_box.h"
 #include"gpu_resource_helper.h"
-
+#define JointNumAligned 64
 struct MeshRenderParameter
 {
     DirectX::XMFLOAT4X4 mTransformMatrix;
@@ -20,6 +20,10 @@ class SkeletalMeshRenderBatch
     size_t mInstaceDataOffset = 0;
 
     size_t mVertexDataOffset = 0;
+    
+    std::vector<int32_t> mAnimationDataGlobelId;
+
+    std::vector<int32_t> mAnimationDataGlobelOffset;
 public:
     void CreateOnCmdListOpen(
         const int32_t meshIndex,
@@ -28,6 +32,7 @@ public:
         const std::vector<std::string>& animationFileList,
         const std::string& materialName
     );
+    void GeneratePoseCompute();
 
     void UpdateSkinValue(
         size_t& globelSkinVertNum,
@@ -51,23 +56,72 @@ public:
     size_t ComputeSkinResultBufferCount();
 
     size_t ComputeSkeletalMatrixBufferCount();
+
+    int32_t ComputeAlignedSkeletalBlockCount() const;
+
+    void CollectAnimationData(
+        std::vector<DirectX::XMUINT4>& animationMessagePack,
+        std::vector<DirectX::XMFLOAT4> &animationDataPack
+    );
+
+    void UpdateSkinValueGpu(
+        size_t& globelSkinVertNum,
+        size_t& globelSkinMatrixNum,
+        size_t& globelIndirectArgNum,
+        SimpleBufferStaging& skinIndirectArgBufferCpu
+    );
+
+    void CollectAnimationSimulationData(
+        std::vector<DirectX::XMFLOAT4> &animationSimulationUniform,
+        int32_t& outputOffset,
+        float delta_time
+    );
 private:
 
     void LocalPoseToModelPose(const std::vector<SimpleSkeletonJoint>& localPose, std::vector<DirectX::XMMATRIX>& modelPose);
 };
 
+struct GpuAnimSimulation
+{
+    SimpleBufferStaging animationStagingBuffer;
 
+    SimpleReadOnlyBuffer animationClipMessage;       //save all skeletal animation descriptor info data
+
+    SimpleReadOnlyBuffer animationClipInput;         //save all skeletal animation curve clip data
+
+    size_t animationUniformCount = 0;
+
+    SimpleBufferStaging animationUniformCpu[3];
+
+    SimpleReadOnlyBuffer animationUniformGpu;         //save all skeletal animation curve clip data
+
+    SimpleReadWriteBuffer animationResultOutput;     ///save the skeletal animation graph simulation result(local space skeleton joint pose)
+
+    void CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList);
+
+    void OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList, SimpleBufferStaging& arcBufferOut,uint32_t currentFrameIndex, float delta_time, uint32_t& indirectSimulationCount);
+
+    void OnDispatch(GpuResourceUtil::GlobelPipelineManager& allPepelines);
+};
+
+enum class SimulationType
+{
+    SimulationCpu = 0,
+    SimulationGpu
+};
 class AnimationSimulateDemo
 {
     size_t samplerDescriptor;
     SimpleCamera baseView;
     SimpleSkyBox baseSkyBox;
 
-    SimpleReadOnlyBuffer animationClipInput;         //save all skeletal animation curve clip data
     SimpleReadOnlyBuffer bindposeMatrixInput;        //save the bindposeMatrix for each mesh
     SimpleReadOnlyBuffer skeletonHierarchyInput;     //save the parent index(1,2,4,8,16,32,64) for each joint of skeleton
-    SimpleReadWriteBuffer SkeletonAnimationResultGpu;    //save the skeletal animation graph simulation result(local space skeleton joint pose)
+    SimpleReadWriteBuffer SkeletonAnimationResultGpu;    //save the skeletal animation graph simulation result(globel space skeleton joint pose)
     SimpleBufferStaging SkeletonAnimationResultCpu[3];
+
+    SimulationType curType;
+    GpuAnimSimulation gpuPass;
 
     SimpleReadOnlyBuffer skinIndirectArgBufferGpu;    //save the skeletal animation graph simulation result(local space skeleton joint pose)
     SimpleBufferStaging skinIndirectArgBufferCpu[3];
