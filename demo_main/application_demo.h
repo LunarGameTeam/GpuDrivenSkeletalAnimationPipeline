@@ -8,7 +8,11 @@ struct MeshRenderParameter
     int32_t mAnimationindex = 0;
     float curPlayTime = 0.0f;
 };
-
+struct SkeletonParentIdLayer 
+{
+    int32_t mBlockCount = 0;
+    std::vector<int32_t> mParentIdData;
+};
 class SkeletalMeshRenderBatch
 {
     SimpleStaticMeshRenderer mRenderer;
@@ -20,7 +24,10 @@ class SkeletalMeshRenderBatch
     size_t mInstaceDataOffset = 0;
 
     size_t mVertexDataOffset = 0;
-    
+    //skeleton data offset info
+    std::vector<int32_t> mSkeletonParentDataGlobelOffset;
+
+    //animation data offset info
     std::vector<int32_t> mAnimationDataGlobelId;
 
     std::vector<int32_t> mAnimationDataGlobelOffset;
@@ -32,7 +39,6 @@ public:
         const std::vector<std::string>& animationFileList,
         const std::string& materialName
     );
-    void GeneratePoseCompute();
 
     void UpdateSkinValue(
         size_t& globelSkinVertNum,
@@ -57,12 +63,18 @@ public:
 
     size_t ComputeSkeletalMatrixBufferCount();
 
+    int32_t ComputeAssetAlignedSkeletalBlockCount() const;
+
     int32_t ComputeAlignedSkeletalBlockCount() const;
 
     void CollectAnimationData(
         std::vector<DirectX::XMUINT4>& animationMessagePack,
         std::vector<DirectX::XMFLOAT4> &animationDataPack
     );
+
+    void CollectSkeletonHierarchyData(std::vector<SkeletonParentIdLayer>& skeletonMessagePack);
+
+    void CollectLocalToWorldUniformMessage(int32_t index,std::vector<DirectX::XMUINT4>& skeletonMessagePack);
 
     void UpdateSkinValueGpu(
         size_t& globelSkinVertNum,
@@ -83,6 +95,8 @@ private:
 
 struct GpuAnimSimulation
 {
+    int32_t allGpuSimulationBlock = 0;
+
     SimpleBufferStaging animationStagingBuffer;
 
     SimpleReadOnlyBuffer animationClipMessage;       //save all skeletal animation descriptor info data
@@ -99,9 +113,33 @@ struct GpuAnimSimulation
 
     void CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList);
 
-    void OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList, SimpleBufferStaging& arcBufferOut,uint32_t currentFrameIndex, float delta_time, uint32_t& indirectSimulationCount);
+    void OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList,uint32_t currentFrameIndex, float delta_time);
 
     void OnDispatch(GpuResourceUtil::GlobelPipelineManager& allPepelines);
+};
+
+struct GpuSkeletonTreeLocalToWorld 
+{
+    std::vector<SkeletonParentIdLayer> skeletonMessagePack;
+
+    SimpleBufferStaging prefixUniformCpu[3];
+    SimpleReadOnlyBuffer prefixUniformGpu;
+
+    SimpleBufferStaging mergeUniformCpu[3];
+    SimpleReadOnlyBuffer mergeUniformGpu;
+
+    SimpleBufferStaging trieStagingBuffer;
+    SimpleReadOnlyBuffer jointPrefixMessage;
+    SimpleReadOnlyBuffer jointMergeInput;
+    //save the world space skeleton joint pose
+    SimpleReadWriteBuffer worldSpaceSkeletonResultMap0;
+    SimpleReadWriteBuffer worldSpaceSkeletonResultMap1;
+
+    void CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList);
+
+    void OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList, uint32_t currentFrameIndex, float delta_time);
+
+    void OnDispatch(int32_t blockComputeCount,SimpleReadWriteBuffer animationResultOutput, GpuResourceUtil::GlobelPipelineManager& allPepelines);
 };
 
 enum class SimulationType
@@ -121,7 +159,8 @@ class AnimationSimulateDemo
     SimpleBufferStaging SkeletonAnimationResultCpu[3];
 
     SimulationType curType;
-    GpuAnimSimulation gpuPass;
+    GpuAnimSimulation gpuAnimationSimulationPass;
+    GpuSkeletonTreeLocalToWorld gpuLocalToWorldPass;
 
     SimpleReadOnlyBuffer skinIndirectArgBufferGpu;    //save the skeletal animation graph simulation result(local space skeleton joint pose)
     SimpleBufferStaging skinIndirectArgBufferCpu[3];

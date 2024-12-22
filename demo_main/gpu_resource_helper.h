@@ -9,6 +9,9 @@ namespace GpuResourceUtil
 
     extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationSumulationInputRootParam;
 
+    extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefixRootParam;
+
+    extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldMergeRootParam;
     //skin indirect Shader
     extern Microsoft::WRL::ComPtr<ID3D12CommandSignature> skinPassIndirectSignature;
 
@@ -51,6 +54,8 @@ namespace GpuResourceUtil
 
     void GenerateGpuAnimationSimulationRootSignature();
 
+    void GenerateGpuAnimationLocalToWorldRootSignature();
+
     void GenerateComputeShaderPipeline(
         ID3D12RootSignature* RootSignature,
         Microsoft::WRL::ComPtr<ID3D12PipelineState>& pipelineOut,
@@ -65,6 +70,8 @@ namespace GpuResourceUtil
         Microsoft::WRL::ComPtr<ID3D12PipelineState> skinDrawPipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuSkinDispatchPipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationSimulationPipeline;
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldPrefixPipeline;
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldMergePipeline;
     };
     struct computePassIndirectCommand
     {
