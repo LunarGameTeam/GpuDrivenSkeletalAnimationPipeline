@@ -1,9 +1,8 @@
 #include"matrix.hlsl"
 StructuredBuffer<float4x4> LocalPoseDataBuffer : register(t0);
-StructuredBuffer<uint> gParentPointBuffer : register(t1);
+StructuredBuffer<int> gParentPointBuffer : register(t1);
 StructuredBuffer<uint> instanceUniformBuffer : register(t2);
 RWStructuredBuffer<float4x4> PoseDataBufferOut : register(u3);
-groupshared float4x4 tempMatrixMulResult[64];
 static const uint AlignedJointNum = 64;
 [numthreads(64, 1, 1)]
 void CSMain(
@@ -13,19 +12,18 @@ void CSMain(
 	uint GI : SV_GroupIndex
 )
 {
-	uint cur_output_index = DTid.x;
-	uint cur_parent_index_begin = cur_output_index * 6;
-	uint cur_parent_index_0 = gParentPointBuffer[cur_parent_index_begin];
-	tempMatrixMulResult[GTid.x] = mul(LocalPoseDataBuffer[DTid.x], LocalPoseDataBuffer[cur_parent_index_0]);
-	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult[GTid.x] = mul(tempMatrixMulResult[GTid.x], LocalPoseDataBuffer[cur_parent_index_0 + 1]);
-	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult[GTid.x] = mul(tempMatrixMulResult[GTid.x], LocalPoseDataBuffer[cur_parent_index_0 + 2]);
-	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult[GTid.x] = mul(tempMatrixMulResult[GTid.x], LocalPoseDataBuffer[cur_parent_index_0 + 3]);
-	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult[GTid.x] = mul(tempMatrixMulResult[GTid.x], LocalPoseDataBuffer[cur_parent_index_0 + 4]);
-	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult[GTid.x] = mul(tempMatrixMulResult[GTid.x], LocalPoseDataBuffer[cur_parent_index_0 + 5]);
-	PoseDataBufferOut[cur_output_index] = tempMatrixMulResult[GTid.x];
+	uint4 curUniformData = instanceUniformBuffer[Gid.x];
+	//bone matrix
+	uint curSampleBegin = curUniformData.z * AlignedJointNum;
+	uint globelSampleIndex = curSampleBegin + GTid.x;
+	float4x4 curPoseMatrix = LocalPoseDataBuffer[curSampleBegin + GTid.x];
+	//relative bone id
+	uint curBlockOffset = curUniformData.x * AlignedJointNum;
+	uint curPoseGlobelBegin = curPoseMatrix - curBlockOffset;
+	int cur_bone_parent = gParentPointBuffer[DTid.x];
+	if(cur_bone_parent > 0)
+	{
+		curPoseMatrix = mul(curPoseMatrix,LocalPoseDataBuffer[curPoseGlobelBegin + cur_bone_parent]);
+	}
+	PoseDataBufferOut[globelSampleIndex] = curPoseMatrix;
 }

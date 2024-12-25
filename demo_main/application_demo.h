@@ -74,7 +74,7 @@ public:
 
     void CollectSkeletonHierarchyData(std::vector<SkeletonParentIdLayer>& skeletonMessagePack);
 
-    void CollectLocalToWorldUniformMessage(int32_t index,std::vector<DirectX::XMUINT4>& skeletonMessagePack);
+    void CollectLocalToWorldUniformMessage(int32_t index,std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelBlockOffset);
 
     void UpdateSkinValueGpu(
         size_t& globelSkinVertNum,
@@ -135,11 +135,13 @@ struct GpuSkeletonTreeLocalToWorld
     SimpleReadWriteBuffer worldSpaceSkeletonResultMap0;
     SimpleReadWriteBuffer worldSpaceSkeletonResultMap1;
 
+    std::vector<int32_t> dispathcCount;
+
     void CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList);
 
     void OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList, uint32_t currentFrameIndex, float delta_time);
 
-    void OnDispatch(int32_t blockComputeCount,SimpleReadWriteBuffer animationResultOutput, GpuResourceUtil::GlobelPipelineManager& allPepelines);
+    void OnDispatch(SimpleReadWriteBuffer animationResultOutput, GpuResourceUtil::GlobelPipelineManager& allPepelines);
 };
 
 enum class SimulationType

@@ -88,11 +88,15 @@ uint Aligned2Pow(uint size_in, uint size_aligned_in)
 }
 
 [numthreads(64, 1, 1)]
-void CSMain(uint3 threadIndex : SV_DispatchThreadID)
+void CSMain(
+	uint3 Gid : SV_GroupID, 
+	uint3 DTid : SV_DispatchThreadID,
+	uint3 GTid : SV_GroupThreadID
+)
 {
-	uint globel_instance_offset = threadIndex.y;
+	uint globel_instance_offset = Gid.x;
 	float4 cur_simulation_param = simulationParameterBuffer[globel_instance_offset];
-	uint cur_joint_index = cur_simulation_param.w + threadIndex.x;
+	uint cur_joint_index = cur_simulation_param.w + GTid.x;
 	uint cur_anim_id = (uint)(cur_simulation_param.y);
 	float4 cur_animation_info = gAnimationInfoBuffer[cur_anim_id];
 	uint anim_joint_num = cur_animation_info.w;

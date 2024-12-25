@@ -353,7 +353,7 @@ void SkeletalMeshRenderBatch::CollectSkeletonHierarchyData(std::vector<SkeletonP
     }
 }
 
-void SkeletalMeshRenderBatch::CollectLocalToWorldUniformMessage(int32_t index, std::vector<DirectX::XMUINT4>& skeletonMessagePack)
+void SkeletalMeshRenderBatch::CollectLocalToWorldUniformMessage(int32_t index, std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t &globelBlockOffset)
 {
     int32_t curCommandCount = ComputeAssetAlignedSkeletalBlockCount();
     if (mSkeletonParentDataGlobelOffset.size() > index)
@@ -364,10 +364,13 @@ void SkeletalMeshRenderBatch::CollectLocalToWorldUniformMessage(int32_t index, s
             for (int32_t eachBlock = curBegin; eachBlock < curCommandCount; ++eachBlock)
             {
                 DirectX::XMUINT4 commandUniform;
-                commandUniform.x = eachBlock - curBegin;
+                commandUniform.x = eachBlock;
                 commandUniform.y = mSkeletonParentDataGlobelOffset[index];
+                commandUniform.z = globelBlockOffset + eachBlock;
+                commandUniform.w = curBegin;
                 skeletonMessagePack.push_back(commandUniform);
             }
+            globelBlockOffset += curCommandCount;
         }
     }
 }
@@ -510,7 +513,7 @@ void GpuAnimSimulation::OnDispatch(GpuResourceUtil::GlobelPipelineManager& allPe
     GpuResourceUtil::BindDescriptorToPipelineCS(2, animationUniformGpu.mDescriptorOffsetSRV);
     GpuResourceUtil::BindDescriptorToPipelineCS(3, animationResultOutput.mDescriptorOffsetUAV);
     g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationSimulationPipeline.Get());
-    g_pd3dCommandList->Dispatch(1, animationUniformCount,1);
+    g_pd3dCommandList->Dispatch(animationUniformCount,1 ,1);
 }
 
 void GpuSkeletonTreeLocalToWorld::CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList)
@@ -541,16 +544,21 @@ void GpuSkeletonTreeLocalToWorld::CreateOnCmdListOpen(std::vector<SkeletalMeshRe
 
 void GpuSkeletonTreeLocalToWorld::OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList, uint32_t currentFrameIndex, float delta_time)
 {
+    dispathcCount.clear();
     std::vector<DirectX::XMUINT4> prefixOffsetPack;
+    int32_t globelBlockOffset = 0;
     for (int32_t meshIndex = 0; meshIndex < meshValueList.size(); ++meshIndex)
     {
-        meshValueList[meshIndex].CollectLocalToWorldUniformMessage(0,prefixOffsetPack);
+        meshValueList[meshIndex].CollectLocalToWorldUniformMessage(0,prefixOffsetPack, globelBlockOffset);
     }
+    dispathcCount.push_back(prefixOffsetPack.size());
+    globelBlockOffset = 0;
     std::vector<DirectX::XMUINT4> mergeOffsetPack;
     for (int32_t meshIndex = 0; meshIndex < meshValueList.size(); ++meshIndex)
     {
-        meshValueList[meshIndex].CollectLocalToWorldUniformMessage(1, mergeOffsetPack);
+        meshValueList[meshIndex].CollectLocalToWorldUniformMessage(1, mergeOffsetPack, globelBlockOffset);
     }
+    dispathcCount.push_back(mergeOffsetPack.size());
     if (prefixUniformCpu[0].mapPointer == nullptr)
     {
         for (int32_t i = 0; i < 3; ++i)
@@ -575,25 +583,41 @@ void GpuSkeletonTreeLocalToWorld::OnUpdate(std::vector<SkeletalMeshRenderBatch>&
 }
 
 void GpuSkeletonTreeLocalToWorld::OnDispatch(
-    int32_t blockComputeCount,
     SimpleReadWriteBuffer animationResultOutput,
     GpuResourceUtil::GlobelPipelineManager& allPepelines
 )
 {
-    //gpuskin
-    D3D12_RESOURCE_BARRIER gpuAnimationSimulateBeginBarrier[] =
+    //prefix Pass
+    D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldPrefixBarrier[] =
     {
         CD3DX12_RESOURCE_BARRIER::Transition(animationResultOutput.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
         CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
     };
-    g_pd3dCommandList->ResourceBarrier(2, gpuAnimationSimulateBeginBarrier);
+    g_pd3dCommandList->ResourceBarrier(2, gpuAnimationLocalToWorldPrefixBarrier);
     g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get());
     GpuResourceUtil::BindDescriptorToPipelineCS(0, animationResultOutput.mDescriptorOffsetSRV);
     GpuResourceUtil::BindDescriptorToPipelineCS(1, jointPrefixMessage.mDescriptorOffsetSRV);
     GpuResourceUtil::BindDescriptorToPipelineCS(2, prefixUniformGpu.mDescriptorOffsetSRV);
     GpuResourceUtil::BindDescriptorToPipelineCS(3, worldSpaceSkeletonResultMap0.mDescriptorOffsetUAV);
     g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationLocalToWorldPrefixPipeline.Get());
-    g_pd3dCommandList->Dispatch(1, blockComputeCount, 1);
+    g_pd3dCommandList->Dispatch(dispathcCount[0],1, 1);
+
+    //Merge Pass
+    D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldMergeBarrier[] =
+    {
+        CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap1.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+    };
+    g_pd3dCommandList->ResourceBarrier(2, gpuAnimationLocalToWorldMergeBarrier);
+    g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuAnimationLocalToWorldMergeRootParam.Get());
+    GpuResourceUtil::BindDescriptorToPipelineCS(0, worldSpaceSkeletonResultMap0.mDescriptorOffsetSRV);
+    GpuResourceUtil::BindDescriptorToPipelineCS(1, jointPrefixMessage.mDescriptorOffsetSRV);
+    GpuResourceUtil::BindDescriptorToPipelineCS(2, mergeUniformGpu.mDescriptorOffsetSRV);
+    GpuResourceUtil::BindDescriptorToPipelineCS(3, worldSpaceSkeletonResultMap1.mDescriptorOffsetUAV);
+    g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationLocalToWorldMergePipeline.Get());
+    g_pd3dCommandList->Dispatch(dispathcCount[1], 1, 1);
+
+
 }
 
 void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
@@ -663,7 +687,7 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
 }
 void AnimationSimulateDemo::Create()
 {
-    curType = SimulationType::SimulationGpu;
+    curType = SimulationType::SimulationCpu;
     D3D12_SAMPLER_DESC curSampler = {};
     curSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     curSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -823,7 +847,7 @@ void AnimationSimulateDemo::DrawDemoData(float delta_time)
     if (curType == SimulationType::SimulationGpu)
     {
         gpuAnimationSimulationPass.OnDispatch(mAllPipelines);
-        gpuLocalToWorldPass.OnDispatch(gpuAnimationSimulationPass.allGpuSimulationBlock,gpuAnimationSimulationPass.animationResultOutput,mAllPipelines);
+        gpuLocalToWorldPass.OnDispatch(gpuAnimationSimulationPass.animationResultOutput,mAllPipelines);
     }
     //gpuskin
     D3D12_RESOURCE_BARRIER skeletonSkinBufferBarrier[] =

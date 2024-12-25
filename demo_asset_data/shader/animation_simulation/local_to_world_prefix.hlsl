@@ -14,14 +14,14 @@ void CSMain(
 	uint GI : SV_GroupIndex
 )
 {
-	uint4 curUniformData = instanceUniformBuffer[DTid.y];
+	uint4 curUniformData = instanceUniformBuffer[Gid.x];
 	float4x4 curPoseMatrix = LocalPoseDataBuffer[DTid.x];
 	uint curBlockOffset = curUniformData.x * AlignedJointNum;
 
 	uint curBoneId = curBlockOffset + GTid.x;
 	uint curParentDataOffset = (curUniformData.y * 6) * AlignedJointNum + curBoneId * 6;
 	int curParentId = gParentPointBuffer[curParentDataOffset] - curBlockOffset;
-	uint curPoseGlobelBegin = DTid.y * AlignedJointNum;
+	uint curPoseGlobelBegin = Gid.x * AlignedJointNum;
 	tempMatrixMulResult0[GTid.x] = curPoseMatrix;
 	if (curParentId > 0)
 	{
