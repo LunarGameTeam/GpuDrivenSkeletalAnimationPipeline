@@ -76,6 +76,8 @@ public:
 
     void CollectLocalToWorldUniformMessage(int32_t index,std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelBlockOffset);
 
+    void CollectMeshBindMessage(std::vector<DirectX::XMFLOAT4X4>& BindPosePack, std::vector<uint32_t>& bindReflectId);
+
     void UpdateSkinValueGpu(
         size_t& globelSkinVertNum,
         size_t& globelSkinMatrixNum,
@@ -144,6 +146,26 @@ struct GpuSkeletonTreeLocalToWorld
     void OnDispatch(SimpleReadWriteBuffer animationResultOutput, GpuResourceUtil::GlobelPipelineManager& allPepelines);
 };
 
+struct GpuAnimPoseGen
+{
+    size_t allSkeletalBlockCount = 0;
+
+    SimpleReadOnlyBuffer MeshBindMatrix;
+
+    SimpleReadOnlyBuffer BindBoneToSkeletonBoneId;
+
+    SimpleBufferStaging MeshBindMessageStagingBuffer;
+
+    void CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList);
+
+    void OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList, uint32_t currentFrameIndex, float delta_time);
+
+    void OnDispatch(SimpleReadOnlyBuffer& uniformBuffer,
+        SimpleReadWriteBuffer& animationResultBuffer,
+        SimpleReadWriteBuffer& SkinPoseBuffer,
+        GpuResourceUtil::GlobelPipelineManager& allPepelines
+    );
+};
 enum class SimulationType
 {
     SimulationCpu = 0,
@@ -155,20 +177,16 @@ class AnimationSimulateDemo
     SimpleCamera baseView;
     SimpleSkyBox baseSkyBox;
 
-    SimpleReadOnlyBuffer bindposeMatrixInput;        //save the bindposeMatrix for each mesh
-    SimpleReadOnlyBuffer skeletonHierarchyInput;     //save the parent index(1,2,4,8,16,32,64) for each joint of skeleton
     SimpleReadWriteBuffer SkeletonAnimationResultGpu;    //save the skeletal animation graph simulation result(globel space skeleton joint pose)
     SimpleBufferStaging SkeletonAnimationResultCpu[3];
 
     SimulationType curType;
     GpuAnimSimulation gpuAnimationSimulationPass;
     GpuSkeletonTreeLocalToWorld gpuLocalToWorldPass;
+    GpuAnimPoseGen              gpuPoseGenPass;
 
     SimpleReadOnlyBuffer skinIndirectArgBufferGpu;    //save the skeletal animation graph simulation result(local space skeleton joint pose)
     SimpleBufferStaging skinIndirectArgBufferCpu[3];
-    //save the world space skeleton joint pose
-    SimpleReadWriteBuffer worldSpaceSkeletonResultMap0;
-    SimpleReadWriteBuffer worldSpaceSkeletonResultMap1;
 
     //save the vertex skin result
     SimpleReadWriteBuffer skinVertexResult;

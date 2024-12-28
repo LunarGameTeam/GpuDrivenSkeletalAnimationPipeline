@@ -1,7 +1,6 @@
-#include"matrix.hlsl"
 StructuredBuffer<float4x4> LocalPoseDataBuffer : register(t0);
 StructuredBuffer<int> gParentPointBuffer : register(t1);
-StructuredBuffer<uint> instanceUniformBuffer : register(t2);
+StructuredBuffer<uint4> instanceUniformBuffer : register(t2);
 RWStructuredBuffer<float4x4> PoseDataBufferOut : register(u3);
 static const uint AlignedJointNum = 64;
 [numthreads(64, 1, 1)]
@@ -19,11 +18,13 @@ void CSMain(
 	float4x4 curPoseMatrix = LocalPoseDataBuffer[curSampleBegin + GTid.x];
 	//relative bone id
 	uint curBlockOffset = curUniformData.x * AlignedJointNum;
-	uint curPoseGlobelBegin = curPoseMatrix - curBlockOffset;
-	int cur_bone_parent = gParentPointBuffer[DTid.x];
+	uint curPoseGlobelBegin = curSampleBegin - curBlockOffset;
+
+	uint parentFind = curUniformData.y * AlignedJointNum + GTid.x;
+	int cur_bone_parent = gParentPointBuffer[parentFind];
 	if(cur_bone_parent > 0)
 	{
-		curPoseMatrix = mul(curPoseMatrix,LocalPoseDataBuffer[curPoseGlobelBegin + cur_bone_parent]);
+		curPoseMatrix = mul(LocalPoseDataBuffer[curPoseGlobelBegin + cur_bone_parent],curPoseMatrix);
 	}
 	PoseDataBufferOut[globelSampleIndex] = curPoseMatrix;
 }

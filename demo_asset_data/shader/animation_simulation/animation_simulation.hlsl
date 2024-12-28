@@ -51,8 +51,8 @@ void SampleAnimationByIdAndTime(
 	in float cur_anim_time,
 	in float4 cur_animation_info,
 	out float4 translation_lerp,
-	out float4 scal_lerp,
-	out float4 rotation_lerp
+	out float4 rotation_lerp,
+	out float4 scal_lerp
 )
 {
 	uint globel_anim_offset = cur_animation_info.x;
@@ -111,7 +111,6 @@ void CSMain(
 	SampleAnimationByIdAndTime(cur_joint_index,cur_anim_time, cur_animation_info,translation_lerp, rotation_lerp, scal_lerp);
 	//compose the animation transform to matrix
 	float4x4 combine_matrix = compose(translation_lerp.xyz, rotation_lerp, scal_lerp.xyz);
-	//output the animation matrix local space
 	uint globel_alignment_joint_offset = cur_simulation_param.z + cur_joint_index;
 	LocalPoseDataOutBuffer[globel_alignment_joint_offset] = combine_matrix;
 }
