@@ -12,19 +12,44 @@ void CSMain(
 )
 {
 	uint4 curUniformData = instanceUniformBuffer[Gid.x];
-	//bone matrix
-	uint curSampleBegin = curUniformData.z * AlignedJointNum;
-	uint globelSampleIndex = curSampleBegin + GTid.x;
-	float4x4 curPoseMatrix = LocalPoseDataBuffer[curSampleBegin + GTid.x];
-	//relative bone id
-	uint curBlockOffset = curUniformData.x * AlignedJointNum;
-	uint curPoseGlobelBegin = curSampleBegin - curBlockOffset;
-
-	uint parentFind = curUniformData.y * AlignedJointNum + GTid.x;
-	int cur_bone_parent = gParentPointBuffer[parentFind];
-	if(cur_bone_parent > 0)
+	uint parentFindBegin = curUniformData.y * AlignedJointNum;
+	uint instanceBoneSampleBegin = (Gid.x - curUniformData.x) * AlignedJointNum;
+	int cur_bone_id = curUniformData.x * AlignedJointNum + GTid.x;
+	int cur_bone_parent = gParentPointBuffer[parentFindBegin + cur_bone_id];
+	float4x4 curPoseMatrix = LocalPoseDataBuffer[DTid.x];
+	if (cur_bone_parent < 0)
 	{
-		curPoseMatrix = mul(LocalPoseDataBuffer[curPoseGlobelBegin + cur_bone_parent],curPoseMatrix);
+		PoseDataBufferOut[DTid.x] = curPoseMatrix;
+		return;
 	}
-	PoseDataBufferOut[globelSampleIndex] = curPoseMatrix;
+	float4x4 curparentMatrix = LocalPoseDataBuffer[instanceBoneSampleBegin + cur_bone_parent];
+	curPoseMatrix = mul(curparentMatrix, curPoseMatrix);
+	//pass2
+	cur_bone_parent = gParentPointBuffer[parentFindBegin + cur_bone_parent];
+	if (cur_bone_parent < 0)
+	{
+		PoseDataBufferOut[DTid.x] = curPoseMatrix;
+		return;
+	}
+	curparentMatrix = LocalPoseDataBuffer[instanceBoneSampleBegin + cur_bone_parent];
+	curPoseMatrix = mul(curparentMatrix, curPoseMatrix);
+	//pass3
+	cur_bone_parent = gParentPointBuffer[parentFindBegin + cur_bone_parent];
+	if (cur_bone_parent < 0)
+	{
+		PoseDataBufferOut[DTid.x] = curPoseMatrix;
+		return;
+	}
+	curparentMatrix = LocalPoseDataBuffer[instanceBoneSampleBegin + cur_bone_parent];
+	curPoseMatrix = mul(curparentMatrix, curPoseMatrix);
+	//pass4
+	cur_bone_parent = gParentPointBuffer[parentFindBegin + cur_bone_parent];
+	if (cur_bone_parent < 0)
+	{
+		PoseDataBufferOut[DTid.x] = curPoseMatrix;
+		return;
+	}
+	curparentMatrix = LocalPoseDataBuffer[instanceBoneSampleBegin + cur_bone_parent];
+	curPoseMatrix = mul(curparentMatrix, curPoseMatrix);
+	PoseDataBufferOut[DTid.x] = curPoseMatrix;
 }

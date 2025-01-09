@@ -57,9 +57,14 @@ void SkeletalMeshRenderBatch::CreateOnCmdListOpen(
     const std::string& materialName
 )
 {
-    for (int32_t i = 0; i < 500; ++i)
+    for (int32_t i = 0; i < 100; ++i)
     {
-        AddInstance(MatrixCompose(DirectX::XMFLOAT4(i, 1, 2 * meshIndex, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(0.1, 0.1, 0.1, 1)), 0, 0.0f);
+        for (int32_t j = 0; j < 100; ++j)
+        {
+            float rand_time = 0;
+            rand_time /= 1000.0f;
+            AddInstance(MatrixCompose(DirectX::XMFLOAT4(i, 1, 2 * j, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1)), 0, rand_time);
+        }
     }
     mRenderer.CreateOnCmdListOpen(meshFile, skeletonFile, animationFileList, materialName);
     mSkeletalMeshPointer = dynamic_cast<SimpleSkeletalMeshData*>(mRenderer.GetCurrentMesh());
@@ -253,10 +258,7 @@ void SkeletalMeshRenderBatch::CollectSkeletonHierarchyData(std::vector<SkeletonP
     uint32_t boneCount = curBoneTree.size();
     uint32_t alignedJointNum = SizeAligned2Pow((uint32_t)(boneCount), JointNumAligned);
     uint32_t commandCount = alignedJointNum / JointNumAligned;
-    if (skeletonMessagePack.size() == 0)
-    {
-        skeletonMessagePack.emplace_back();
-    }
+
     mSkeletonParentDataGlobelOffset.push_back(skeletonMessagePack[0].mBlockCount);
     skeletonMessagePack[0].mBlockCount += commandCount;
     
@@ -302,51 +304,34 @@ void SkeletalMeshRenderBatch::CollectSkeletonHierarchyData(std::vector<SkeletonP
             }
         }
     }
+    mSkeletonParentDataGlobelOffset.push_back(skeletonMessagePack[1].mBlockCount);
+    skeletonMessagePack[1].mBlockCount += commandCount;
+    for (uint32_t jointId = 0; jointId < JointNumAligned; ++jointId)
+    {
+        skeletonMessagePack[1].mParentIdData.push_back(-1);
+    }
     //Merge layer
     for (int32_t curMergeCommandDstId = 1; curMergeCommandDstId < commandCount; ++curMergeCommandDstId)
     {
-        int32_t curMergeCommandSourceId = curMergeCommandDstId;
-        int32_t layer = 0;
-        while (true)
+        int32_t curMergeCommandSourceId = curMergeCommandDstId - 1;
+        for (uint32_t jointId = 0; jointId < JointNumAligned; ++jointId)
         {
-            uint32_t dataOutputLayerIndex = layer + 1;
-            uint32_t curFind = std::pow(2, layer);
-            curMergeCommandSourceId -= curFind;
-            if (curMergeCommandSourceId < 0)
+            uint32_t curJointId = curMergeCommandDstId * JointNumAligned + jointId;
+            skeletonMessagePack[1].mParentIdData.push_back(-1);
+            if (curJointId >= boneCount)
             {
-                break;
+                continue;
             }
-            if (skeletonMessagePack.size() <= dataOutputLayerIndex)
+            std::vector<uint32_t>& parentListJoint = parentList[curJointId];
+            uint32_t maxIndex = (curMergeCommandSourceId + 1) * JointNumAligned;
+            for (uint32_t parentIndex = 0; parentIndex < parentListJoint.size(); ++parentIndex)
             {
-                skeletonMessagePack.emplace_back();
-            }
-            mSkeletonParentDataGlobelOffset.push_back(skeletonMessagePack[dataOutputLayerIndex].mBlockCount);
-            skeletonMessagePack[dataOutputLayerIndex].mBlockCount += commandCount - curFind;
-            for (uint32_t jointId = 0; jointId < JointNumAligned; ++jointId)
-            {
-                skeletonMessagePack[dataOutputLayerIndex].mParentIdData.push_back(-1);
-                uint32_t curJointId = curMergeCommandDstId * JointNumAligned + jointId;
-                if (curJointId >= boneCount)
+                if (parentListJoint[parentIndex] < maxIndex)
                 {
-                    continue;
-                }
-                std::vector<uint32_t>& parentListJoint = parentList[curJointId];
-                uint32_t minIndex = curMergeCommandSourceId * JointNumAligned;
-                uint32_t maxIndex = (curMergeCommandSourceId + 1) * JointNumAligned;
-                for (uint32_t parentIndex = 0; parentIndex < parentListJoint.size(); ++parentIndex)
-                {
-                    if (parentListJoint[parentIndex] >= minIndex && parentListJoint[parentIndex] < maxIndex) 
-                    {
-                        skeletonMessagePack[dataOutputLayerIndex].mParentIdData.back() = parentListJoint[parentIndex];
-                        break;
-                    }
-                    if (parentListJoint[parentIndex] < minIndex)
-                    {
-                        break;
-                    }
+                    skeletonMessagePack[1].mParentIdData.back() = parentListJoint[parentIndex];
+                    break;
                 }
             }
-            layer += 1;
         }
     }
 }
@@ -358,14 +343,13 @@ void SkeletalMeshRenderBatch::CollectLocalToWorldUniformMessage(int32_t index, s
     {
         for (auto eachInstanceId = 0; eachInstanceId < mAllInstance.size(); ++eachInstanceId)
         {
-            uint32_t curBegin = std::pow(2, index) - 1;
-            for (int32_t eachBlock = curBegin; eachBlock < curCommandCount; ++eachBlock)
+            for (int32_t eachBlock = 0; eachBlock < curCommandCount; ++eachBlock)
             {
                 DirectX::XMUINT4 commandUniform;
                 commandUniform.x = eachBlock;
                 commandUniform.y = mSkeletonParentDataGlobelOffset[index];
                 commandUniform.z = globelBlockOffset + eachBlock;
-                commandUniform.w = curBegin;
+                commandUniform.w = 0;
                 skeletonMessagePack.push_back(commandUniform);
             }
             globelBlockOffset += curCommandCount;
@@ -383,7 +367,7 @@ void SkeletalMeshRenderBatch::UpdateSkinValueGpu(
     mVertexDataOffset = globelSkinVertNum;
     size_t curSkinMatrixOffset = globelSkinMatrixNum;
     const SimpleSubMesh& curSubMesh = mSkeletalMeshPointer->mSubMesh[0];
-    int32_t alignedJointNum = SizeAligned2Pow((int32_t)(curSubMesh.mRefBonePose.size()), JointNumAligned);
+    int32_t alignedJointNum = SizeAligned2Pow((int32_t)(mSkeletalMeshPointer->GetDefaultSkeleton()->mBoneTree.size()), JointNumAligned);
     globelSkinMatrixNum += mAllInstance.size() * alignedJointNum;
     //ceshi arg buffer
     int32_t verDataCount = curSubMesh.mVertexData.size();
@@ -546,7 +530,7 @@ void GpuAnimSimulation::OnDispatch(GpuResourceUtil::GlobelPipelineManager& allPe
 void GpuSkeletonTreeLocalToWorld::CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList)
 {
     size_t allSkeletalBlockCount = 0;
-
+    skeletonMessagePack.resize(2);
     for (int32_t meshIndex = 0; meshIndex < meshValueList.size(); ++meshIndex)
     {
         meshValueList[meshIndex].CollectSkeletonHierarchyData(skeletonMessagePack);
@@ -631,19 +615,19 @@ void GpuSkeletonTreeLocalToWorld::OnDispatch(
     GpuResourceUtil::BindDescriptorToPipelineCS(3, worldSpaceSkeletonResultMap0.mDescriptorOffsetUAV);
     g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationLocalToWorldPrefixPipeline.Get());
     g_pd3dCommandList->Dispatch(dispathcCount[0],1, 1);
-    //copy Pass
-    D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldMergeBarrierCopy[] =
-    {
-        CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
-        CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap1.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
-    };
-    g_pd3dCommandList->ResourceBarrier(2, gpuAnimationLocalToWorldMergeBarrierCopy);
-    g_pd3dCommandList->CopyBufferRegion(worldSpaceSkeletonResultMap1.mBufferResource.Get(), 0, worldSpaceSkeletonResultMap0.mBufferResource.Get(), 0, dispathcCount[0] * 64 * sizeof(DirectX::XMFLOAT4X4));
+    ////copy Pass
+    //D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldMergeBarrierCopy[] =
+    //{
+    //    CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE),
+    //    CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap1.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST)
+    //};
+    //g_pd3dCommandList->ResourceBarrier(2, gpuAnimationLocalToWorldMergeBarrierCopy);
+    //g_pd3dCommandList->CopyBufferRegion(worldSpaceSkeletonResultMap1.mBufferResource.Get(), 0, worldSpaceSkeletonResultMap0.mBufferResource.Get(), 0, dispathcCount[0] * 64 * sizeof(DirectX::XMFLOAT4X4));
     //merge Pass
     D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldMergeBarrier[] =
     {
-        CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(),D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
-        CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap1.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+        CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap1.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
     };
     g_pd3dCommandList->ResourceBarrier(2, gpuAnimationLocalToWorldMergeBarrier);
     g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuAnimationLocalToWorldMergeRootParam.Get());
