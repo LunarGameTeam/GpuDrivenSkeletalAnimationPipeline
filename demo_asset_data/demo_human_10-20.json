@@ -1,0 +1,13 @@
+{
+	"MeshModelList":
+	[
+		{
+			"MeshFileName":"demo_asset_data/skeletal_mesh_demo/runman/complex_human_run.lskelmesh",
+			"SkeletonFileName":"demo_asset_data/skeletal_mesh_demo/runman/complex_human_run.lskeleton",
+			"AnimationFileList":
+			[
+				"demo_asset_data/skeletal_mesh_demo/runman/complex_human_run.lskelanimclip"
+			]
+		}
+	]
+}

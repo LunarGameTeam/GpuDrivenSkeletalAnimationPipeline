@@ -1,0 +1,22 @@
+{
+	"PbrBaseColor":
+	{
+		"hasTexture": true,
+		"Parameter":"demo_asset_data/skeletal_mesh_demo/runman/base.dds"
+	},
+	"PbrNormalColor":
+	{
+		"hasTexture": true,
+		"Parameter":"demo_asset_data/skeletal_mesh_demo/runman/base.dds"
+	},
+	"PbrMetallicColor":
+	{
+		"hasTexture": true,
+		"Parameter":"demo_asset_data/skeletal_mesh_demo/runman/base.dds"
+	},
+	"PbrRoughnessColor":
+	{
+		"hasTexture": true,
+		"Parameter":"demo_asset_data/skeletal_mesh_demo/runman/base.dds"
+	}
+}

@@ -1,0 +1,13 @@
+{
+	"MeshModelList":
+	[
+		{
+			"MeshFileName":"demo_asset_data/skeletal_mesh_demo/treetest210/tree_test_210.lskelmesh",
+			"SkeletonFileName":"demo_asset_data/skeletal_mesh_demo/treetest210/tree_test_210.lskeleton",
+			"AnimationFileList":
+			[
+				"demo_asset_data/skeletal_mesh_demo/treetest210/tree_test_210.lskelanimclip"
+			]
+		}
+	]
+}
