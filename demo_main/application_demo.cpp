@@ -276,6 +276,41 @@ void SkeletalMeshRenderBatch::CollectSkeletonParentData(std::vector<int32_t>& sk
     }
 }
 
+void SkeletalMeshRenderBatch::CollectSkeletonHierarchyData2(std::vector<int32_t>& skeletonMessagePack)
+{
+    uint32_t globelOffset = skeletonMessagePack.size();
+    auto& curBoneTree = mSkeletalMeshPointer->mSkeleton.mBoneTree;
+    uint32_t boneCount = curBoneTree.size();
+    uint32_t alignedJointNum = SizeAligned2Pow((uint32_t)(boneCount), JointNumAligned);
+    uint32_t commandCount = alignedJointNum / JointNumAligned;
+    for (uint32_t commandId = 0; commandId < commandCount; ++commandId)
+    {
+        for (uint32_t jointId = 0; jointId < JointNumAligned; ++jointId)
+        {
+            for (uint32_t parentId = 0; parentId < 16; ++parentId)
+            {
+                skeletonMessagePack.push_back(-1);
+            }
+        }
+    }
+    std::vector<std::vector<uint32_t>> parentList;
+    parentList.resize(boneCount);
+    for (uint32_t curJointId = 0; curJointId < curBoneTree.size(); ++curJointId)
+    {
+        uint32_t curFilterId = curJointId;
+        while (true)
+        {
+            SimpleSkeletonJoint& eachJoint = curBoneTree[curFilterId];
+            if (eachJoint.mParentIndex == int32_t(-1))
+            {
+                break;
+            }
+            parentList[curJointId].push_back(eachJoint.mParentIndex);
+            curFilterId = eachJoint.mParentIndex;
+        }
+    }
+}
+
 void SkeletalMeshRenderBatch::CollectSkeletonHierarchyData(std::vector<SkeletonParentIdLayer>& skeletonMessagePack)
 {
     auto& curBoneTree = mSkeletalMeshPointer->mSkeleton.mBoneTree;
@@ -559,6 +594,7 @@ void GpuSkeletonTreeLocalToWorld::CreateOnCmdListOpen(std::vector<SkeletalMeshRe
     {
         meshValueList[meshIndex].CollectSkeletonParentData(skeletonParentPack);
         meshValueList[meshIndex].CollectSkeletonHierarchyData(skeletonMessagePack);
+        meshValueList[meshIndex].CollectSkeletonHierarchyData2(skeletonParentPrefixPack2);
         allSkeletalBlockCount += meshValueList[meshIndex].ComputeAlignedSkeletalBlockCount();
     }
     jointSamuelAlgorithmMessage.Create((skeletonParentPack.size() + 1024) * sizeof(int32_t), sizeof(int32_t));

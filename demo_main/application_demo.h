@@ -22,7 +22,8 @@ enum class SimulationType
 enum class GpuSimulationType
 {
     SimulationSamuel = 0,
-    SimulationOur
+    SimulationOur,
+    SimulationOur2
 };
 class SkeletalMeshRenderBatch
 {
@@ -84,6 +85,8 @@ public:
     );
     void CollectSkeletonParentData(std::vector<int32_t>& skeletonMessagePack);
 
+    void CollectSkeletonHierarchyData2(std::vector<int32_t>& skeletonMessagePack);
+
     void CollectSkeletonHierarchyData(std::vector<SkeletonParentIdLayer>& skeletonMessagePack);
 
     void CollectLocalToWorldUniformMessage(int32_t index,std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelBlockOffset);
@@ -135,6 +138,7 @@ struct GpuAnimSimulation
 struct GpuSkeletonTreeLocalToWorld 
 {
     std::vector<int32_t> skeletonParentPack;
+    std::vector<int32_t> skeletonParentPrefixPack2;
     std::vector<SkeletonParentIdLayer> skeletonMessagePack;
 
     SimpleBufferStaging prefixUniformCpu[3];
@@ -146,6 +150,7 @@ struct GpuSkeletonTreeLocalToWorld
     SimpleBufferStaging trieStagingBuffer;
     SimpleReadOnlyBuffer jointSamuelAlgorithmMessage;
     SimpleReadOnlyBuffer jointPrefixMessage;
+    SimpleReadOnlyBuffer jointPrefixMessage2;
     SimpleReadOnlyBuffer jointMergeInput;
     //save the world space skeleton joint pose
     SimpleReadWriteBuffer worldSpaceSkeletonResultMap0;
