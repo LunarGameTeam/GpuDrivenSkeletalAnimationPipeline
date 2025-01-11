@@ -13,6 +13,17 @@ struct SkeletonParentIdLayer
     int32_t mBlockCount = 0;
     std::vector<int32_t> mParentIdData;
 };
+
+enum class SimulationType
+{
+    SimulationCpu = 0,
+    SimulationGpu
+};
+enum class GpuSimulationType
+{
+    SimulationSamuel = 0,
+    SimulationOur
+};
 class SkeletalMeshRenderBatch
 {
     SimpleStaticMeshRenderer mRenderer;
@@ -71,6 +82,7 @@ public:
         std::vector<DirectX::XMUINT4>& animationMessagePack,
         std::vector<DirectX::XMFLOAT4> &animationDataPack
     );
+    void CollectSkeletonParentData(std::vector<int32_t>& skeletonMessagePack);
 
     void CollectSkeletonHierarchyData(std::vector<SkeletonParentIdLayer>& skeletonMessagePack);
 
@@ -122,6 +134,7 @@ struct GpuAnimSimulation
 
 struct GpuSkeletonTreeLocalToWorld 
 {
+    std::vector<int32_t> skeletonParentPack;
     std::vector<SkeletonParentIdLayer> skeletonMessagePack;
 
     SimpleBufferStaging prefixUniformCpu[3];
@@ -131,6 +144,7 @@ struct GpuSkeletonTreeLocalToWorld
     SimpleReadOnlyBuffer mergeUniformGpu;
 
     SimpleBufferStaging trieStagingBuffer;
+    SimpleReadOnlyBuffer jointSamuelAlgorithmMessage;
     SimpleReadOnlyBuffer jointPrefixMessage;
     SimpleReadOnlyBuffer jointMergeInput;
     //save the world space skeleton joint pose
@@ -143,7 +157,11 @@ struct GpuSkeletonTreeLocalToWorld
 
     void OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList, uint32_t currentFrameIndex, float delta_time);
 
-    void OnDispatch(SimpleReadWriteBuffer animationResultOutput, GpuResourceUtil::GlobelPipelineManager& allPepelines);
+    void OnDispatch(
+        SimpleReadWriteBuffer animationResultOutput,
+        GpuResourceUtil::GlobelPipelineManager& allPepelines,
+        GpuSimulationType curGpuType
+    );
 };
 
 struct GpuAnimPoseGen
@@ -166,11 +184,7 @@ struct GpuAnimPoseGen
         GpuResourceUtil::GlobelPipelineManager& allPepelines
     );
 };
-enum class SimulationType
-{
-    SimulationCpu = 0,
-    SimulationGpu
-};
+
 class AnimationSimulateDemo
 {
     size_t samplerDescriptor;
@@ -181,6 +195,7 @@ class AnimationSimulateDemo
     SimpleBufferStaging SkeletonAnimationResultCpu[3];
 
     SimulationType curType;
+    GpuSimulationType curGpuType;
     GpuAnimSimulation gpuAnimationSimulationPass;
     GpuSkeletonTreeLocalToWorld gpuLocalToWorldPass;
     GpuAnimPoseGen              gpuPoseGenPass;

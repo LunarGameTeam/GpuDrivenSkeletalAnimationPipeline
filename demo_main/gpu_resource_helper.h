@@ -75,6 +75,7 @@ namespace GpuResourceUtil
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuSkinDispatchPipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationSimulationPipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldPrefixPipeline;
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldSamuelPipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldMergePipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationPoseGenPipeline;
     };
