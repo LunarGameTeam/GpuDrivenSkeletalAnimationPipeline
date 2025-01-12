@@ -29,6 +29,7 @@ enum class SimulationType
 enum class GpuSimulationType
 {
     SimulationSamuel = 0,
+    SimulationKiyavash,
     SimulationOur,
     SimulationOur2
 };
@@ -52,7 +53,8 @@ class SkeletalMeshRenderBatch
     std::vector<int32_t> mAnimationDataGlobelOffset;
 
     //Leaf layer
-    std::vector<int32_t> mLeafParentDataGlobelOffset;
+    size_t mLeafLayerCount = 0;
+    size_t mLeafLayerOffset = 0;
 public:
     void CreateOnCmdListOpen(
         const int32_t meshIndex,
@@ -100,6 +102,8 @@ public:
     void CollectSkeletonHierarchyData(std::vector<SkeletonParentIdLayer>& skeletonMessagePack);
 
     void CollectLocalToWorldUniformMessage(int32_t index,std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelBlockOffset);
+
+    void CollectLocalToWorldUniformMessageOnlyLeaf(std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelLeafBlockOffset, int32_t& globelBlockOffset);
 
     void CollectMeshBindMessage(std::vector<DirectX::XMFLOAT4X4>& BindPosePack, std::vector<uint32_t>& bindReflectId);
 
@@ -152,6 +156,9 @@ struct GpuSkeletonTreeLocalToWorld
     std::vector<int32_t> skeletonParentPrefixPack2;
     std::vector<SkeletonParentIdLayer> skeletonMessagePack;
 
+    int32_t leafBlockCount;
+    SkeletonLeafParentIdLayer leafParentMessage;
+
     SimpleBufferStaging prefixUniformCpu[3];
     SimpleReadOnlyBuffer prefixUniformGpu;
 
@@ -173,7 +180,12 @@ struct GpuSkeletonTreeLocalToWorld
 
     void CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList);
 
-    void OnUpdate(std::vector<SkeletalMeshRenderBatch>& meshValueList, uint32_t currentFrameIndex, float delta_time);
+    void OnUpdate(
+        GpuSimulationType curGpuType,
+        std::vector<SkeletalMeshRenderBatch>& meshValueList,
+        uint32_t currentFrameIndex,
+        float delta_time
+    );
 
     void OnDispatch(
         SimpleReadWriteBuffer animationResultOutput,
