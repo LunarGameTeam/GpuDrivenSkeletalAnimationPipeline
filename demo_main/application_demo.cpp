@@ -893,30 +893,32 @@ void GpuSkeletonTreeLocalToWorld::OnDispatch(
         D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldPrefixBarrier[] =
         {
             CD3DX12_RESOURCE_BARRIER::Transition(animationResultOutput.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
-            CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+            CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
+            CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap1.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
         };
-        g_pd3dCommandList->ResourceBarrier(2, gpuAnimationLocalToWorldPrefixBarrier);
-        g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get());
+        g_pd3dCommandList->ResourceBarrier(3, gpuAnimationLocalToWorldPrefixBarrier);
+        g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefix2RootParam.Get());
         GpuResourceUtil::BindDescriptorToPipelineCS(0, animationResultOutput.mDescriptorOffsetSRV);
         GpuResourceUtil::BindDescriptorToPipelineCS(1, jointPrefixMessage2.mDescriptorOffsetSRV);
-        GpuResourceUtil::BindDescriptorToPipelineCS(2, prefixUniformGpu.mDescriptorOffsetSRV);
-        GpuResourceUtil::BindDescriptorToPipelineCS(3, worldSpaceSkeletonResultMap0.mDescriptorOffsetUAV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(2, jointMergeInput.mDescriptorOffsetSRV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(3, prefixUniformGpu.mDescriptorOffsetSRV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(4, worldSpaceSkeletonResultMap0.mDescriptorOffsetUAV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(5, worldSpaceSkeletonResultMap1.mDescriptorOffsetUAV);
         g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationLocalToWorldPrefix2Pipeline.Get());
         g_pd3dCommandList->Dispatch(dispathcCount[0], 1, 1);
         //merge Pass
-        D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldMergeBarrier[] =
-        {
-            CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
-            CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap1.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
-        };
-        g_pd3dCommandList->ResourceBarrier(2, gpuAnimationLocalToWorldMergeBarrier);
-        g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuAnimationLocalToWorldMergeRootParam.Get());
-        GpuResourceUtil::BindDescriptorToPipelineCS(0, worldSpaceSkeletonResultMap0.mDescriptorOffsetSRV);
-        GpuResourceUtil::BindDescriptorToPipelineCS(1, jointMergeInput.mDescriptorOffsetSRV);
-        GpuResourceUtil::BindDescriptorToPipelineCS(2, mergeUniformGpu.mDescriptorOffsetSRV);
-        GpuResourceUtil::BindDescriptorToPipelineCS(3, worldSpaceSkeletonResultMap1.mDescriptorOffsetUAV);
-        g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationLocalToWorldMergePipeline.Get());
-        g_pd3dCommandList->Dispatch(dispathcCount[1], 1, 1);
+        //D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldMergeBarrier[] =
+        //{
+        //    CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+        //};
+        //g_pd3dCommandList->ResourceBarrier(1, gpuAnimationLocalToWorldMergeBarrier);
+        //g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuAnimationLocalToWorldMergeRootParam.Get());
+        //GpuResourceUtil::BindDescriptorToPipelineCS(0, worldSpaceSkeletonResultMap0.mDescriptorOffsetSRV);
+        //GpuResourceUtil::BindDescriptorToPipelineCS(1, jointMergeInput.mDescriptorOffsetSRV);
+        //GpuResourceUtil::BindDescriptorToPipelineCS(2, mergeUniformGpu.mDescriptorOffsetSRV);
+        //GpuResourceUtil::BindDescriptorToPipelineCS(3, worldSpaceSkeletonResultMap1.mDescriptorOffsetUAV);
+        //g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationLocalToWorldMergePipeline.Get());
+        //g_pd3dCommandList->Dispatch(dispathcCount[1], 1, 1);
     }
     else if (curGpuType == GpuSimulationType::SimulationOur3)
     {
@@ -1111,7 +1113,7 @@ void AnimationSimulateDemo::Create()
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuSkinInputRootParam.Get(),mAllPipelines.GpuSkinDispatchPipeline, L"demo_asset_data/shader/animation_simulation/skin_simulation.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationSumulationInputRootParam.Get(),mAllPipelines.GpuAnimationSimulationPipeline,L"demo_asset_data/shader/animation_simulation/animation_simulation.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldPrefixPipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_prefix.hlsl");
-    GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldPrefix2Pipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_prefix2.hlsl");
+    GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefix2RootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldPrefix2Pipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_prefix2.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefix3RootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldPrefix3Pipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_prefix3.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldSamuelPipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_samuel.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldKiyavashPipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_kiyavash.hlsl");

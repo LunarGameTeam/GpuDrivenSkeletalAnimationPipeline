@@ -11,6 +11,8 @@ namespace GpuResourceUtil
 
     extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefixRootParam;
 
+    extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefix2RootParam;
+
     extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefix3RootParam;
 
     extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldMergeRootParam;
