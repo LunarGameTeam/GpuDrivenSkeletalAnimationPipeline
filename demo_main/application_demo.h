@@ -14,6 +14,13 @@ struct SkeletonParentIdLayer
     std::vector<int32_t> mParentIdData;
 };
 
+struct SkeletonLeafParentIdLayer
+{
+    std::vector<int32_t> mParentCount;
+    std::vector<int32_t> mParentOffset;
+    std::vector<int32_t> mParentIdData;
+};
+
 enum class SimulationType
 {
     SimulationCpu = 0,
@@ -43,6 +50,9 @@ class SkeletalMeshRenderBatch
     std::vector<int32_t> mAnimationDataGlobelId;
 
     std::vector<int32_t> mAnimationDataGlobelOffset;
+
+    //Leaf layer
+    std::vector<int32_t> mLeafParentDataGlobelOffset;
 public:
     void CreateOnCmdListOpen(
         const int32_t meshIndex,
@@ -93,6 +103,8 @@ public:
 
     void CollectMeshBindMessage(std::vector<DirectX::XMFLOAT4X4>& BindPosePack, std::vector<uint32_t>& bindReflectId);
 
+    void CollectLeafNodeMessage(int32_t& leafLayerCount, SkeletonLeafParentIdLayer& leafParentId);
+
     void UpdateSkinValueGpu(
         size_t& globelSkinVertNum,
         size_t& globelSkinMatrixNum,
@@ -134,7 +146,6 @@ struct GpuAnimSimulation
 
     void OnDispatch(GpuResourceUtil::GlobelPipelineManager& allPepelines);
 };
-
 struct GpuSkeletonTreeLocalToWorld 
 {
     std::vector<int32_t> skeletonParentPack;
@@ -149,6 +160,8 @@ struct GpuSkeletonTreeLocalToWorld
 
     SimpleBufferStaging trieStagingBuffer;
     SimpleReadOnlyBuffer jointSamuelAlgorithmMessage;
+    SimpleReadOnlyBuffer jointKiyavashAlgorithmMessage;
+
     SimpleReadOnlyBuffer jointPrefixMessage;
     SimpleReadOnlyBuffer jointPrefixMessage2;
     SimpleReadOnlyBuffer jointMergeInput;

@@ -16,49 +16,28 @@ void CSMain(
 	uint4 curUniformData = instanceUniformBuffer[Gid.x];
 	float4x4 curPoseMatrix = LocalPoseDataBuffer[DTid.x];
 	uint curBlockOffset = curUniformData.x * AlignedJointNum;
-
 	uint curBoneId = curBlockOffset + GTid.x;
-	uint curParentDataOffset = (curUniformData.y * 6) * AlignedJointNum + curBoneId * 6;
-	int curParentId = gParentPointBuffer[curParentDataOffset] - curBlockOffset;
+	uint curParentDataOffset = (curUniformData.y * 21) * AlignedJointNum + curBoneId * 21;
 	uint curPoseGlobelBegin = Gid.x * AlignedJointNum;
+	for (int i = 0; i < 7; ++i)
+	{
+		int curParentId = gParentPointBuffer[curParentDataOffset + i] - curBlockOffset;
+		if (curParentId < 0)
+		{
+			break;
+		}
+		curPoseMatrix = mul(LocalPoseDataBuffer[curPoseGlobelBegin + curParentId], curPoseMatrix);
+	}
 	tempMatrixMulResult0[GTid.x] = curPoseMatrix;
-	if (curParentId >= 0)
-	{
-		tempMatrixMulResult0[GTid.x] = mul(LocalPoseDataBuffer[curPoseGlobelBegin + curParentId],curPoseMatrix);
-	}
 	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult1[GTid.x] = tempMatrixMulResult0[GTid.x];
-	curParentId = gParentPointBuffer[curParentDataOffset + 1] - curBlockOffset;
-	if (curParentId >= 0)
+	for (int i = 0; i < 7; ++i)
 	{
-		tempMatrixMulResult1[GTid.x] = mul(tempMatrixMulResult0[curParentId], tempMatrixMulResult0[GTid.x]);
+		int curParentId = gParentPointBuffer[curParentDataOffset + 7 + i] - curBlockOffset;
+		if (curParentId < 0)
+		{
+			break;
+		}
+		curPoseMatrix = mul(tempMatrixMulResult0[curParentId], curPoseMatrix);
 	}
-	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult0[GTid.x] = tempMatrixMulResult1[GTid.x];
-	curParentId = gParentPointBuffer[curParentDataOffset + 2] - curBlockOffset;
-	if (curParentId >= 0)
-	{
-		tempMatrixMulResult0[GTid.x] = mul(tempMatrixMulResult1[curParentId], tempMatrixMulResult1[GTid.x]);
-	}
-	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult1[GTid.x] = tempMatrixMulResult0[GTid.x];
-	curParentId = gParentPointBuffer[curParentDataOffset + 3] - curBlockOffset;
-	if (curParentId >= 0)
-	{
-		tempMatrixMulResult1[GTid.x] = mul(tempMatrixMulResult0[curParentId],tempMatrixMulResult0[GTid.x]);
-	}
-	GroupMemoryBarrierWithGroupSync();
-	tempMatrixMulResult0[GTid.x] = tempMatrixMulResult1[GTid.x];
-	curParentId = gParentPointBuffer[curParentDataOffset + 4] - curBlockOffset;
-	if (curParentId >= 0)
-	{
-		tempMatrixMulResult0[GTid.x] = mul(tempMatrixMulResult1[curParentId], tempMatrixMulResult1[GTid.x]);
-	}
-	GroupMemoryBarrierWithGroupSync();
-	PoseDataBufferOut[DTid.x] = tempMatrixMulResult0[GTid.x];
-	curParentId = gParentPointBuffer[curParentDataOffset + 5] - curBlockOffset;
-	if (curParentId >= 0)
-	{
-		PoseDataBufferOut[DTid.x] = mul(tempMatrixMulResult0[curParentId], tempMatrixMulResult0[GTid.x]);
-	}
+	PoseDataBufferOut[DTid.x] = curPoseMatrix;
 }
