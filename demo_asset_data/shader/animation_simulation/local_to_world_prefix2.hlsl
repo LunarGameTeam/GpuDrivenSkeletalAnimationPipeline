@@ -3,7 +3,6 @@ StructuredBuffer<int> gParentPointBuffer : register(t1);
 StructuredBuffer<uint4> instanceUniformBuffer : register(t2);//{x:boneIDoffset,y:parentIDOffset}
 RWStructuredBuffer<float4x4> PoseDataBufferOut : register(u3);
 groupshared float4x4 tempMatrixMulResult0[64];
-groupshared float4x4 tempMatrixMulResult1[64];
 static const uint AlignedJointNum = 64;
 [numthreads(64, 1, 1)]
 void CSMain(
@@ -40,4 +39,6 @@ void CSMain(
 		curPoseMatrix = mul(tempMatrixMulResult0[curParentId], curPoseMatrix);
 	}
 	PoseDataBufferOut[DTid.x] = curPoseMatrix;
+	DeviceMemoryBarrierWithGroupSync();
+	PoseDataBufferOut[DTid.x] = curPoseMatrix * 0.99;
 }

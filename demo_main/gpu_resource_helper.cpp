@@ -6,6 +6,8 @@ namespace GpuResourceUtil
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuSkinInputRootParam = nullptr;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationSumulationInputRootParam = nullptr;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefixRootParam = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefix2RootParam = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefix3RootParam = nullptr;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldMergeRootParam = nullptr;
     Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationPoseGenRootParam = nullptr;
     Microsoft::WRL::ComPtr<ID3D12CommandSignature> skinPassIndirectSignature = nullptr;
@@ -200,6 +202,7 @@ namespace GpuResourceUtil
 
     void GenerateGpuAnimationLocalToWorldRootSignature()
     {
+        //prefix
         CD3DX12_DESCRIPTOR_RANGE1 rangesPrefix[6];
         //gAnimationInfoBuffer
         rangesPrefix[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);
@@ -223,6 +226,22 @@ namespace GpuResourceUtil
         D3DX12SerializeVersionedRootSignature(&rootSignatureDescPrefix, D3D_ROOT_SIGNATURE_VERSION_1_1, &signaturePrefix, &errorPrefix);
         HRESULT hr = g_pd3dDevice->CreateRootSignature(0, signaturePrefix->GetBufferPointer(), signaturePrefix->GetBufferSize(), IID_PPV_ARGS(&globelGpuAnimationLocalToWorldPrefixRootParam));
 
+        //prefix3
+        CD3DX12_ROOT_PARAMETER1 rootParametersPrefix3[5];
+        rootParametersPrefix3[0].InitAsDescriptorTable(1, &rangesPrefix[0], D3D12_SHADER_VISIBILITY_ALL);
+        rootParametersPrefix3[1].InitAsDescriptorTable(1, &rangesPrefix[1], D3D12_SHADER_VISIBILITY_ALL);
+        rootParametersPrefix3[2].InitAsDescriptorTable(1, &rangesPrefix[2], D3D12_SHADER_VISIBILITY_ALL);
+        rootParametersPrefix3[3].InitAsDescriptorTable(1, &rangesPrefix[3], D3D12_SHADER_VISIBILITY_ALL);
+        rootParametersPrefix3[4].InitAsConstants(4, 0, 0, D3D12_SHADER_VISIBILITY_ALL);
+        CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescPrefix3;
+        rootSignatureDescPrefix3.Init_1_1(_countof(rootParametersPrefix3), rootParametersPrefix3, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+        ID3DBlob* signaturePrefix3;
+        ID3DBlob* errorPrefix3;
+        D3DX12SerializeVersionedRootSignature(&rootSignatureDescPrefix3, D3D_ROOT_SIGNATURE_VERSION_1_1, &signaturePrefix3, &errorPrefix3);
+        hr = g_pd3dDevice->CreateRootSignature(0, signaturePrefix3->GetBufferPointer(), signaturePrefix3->GetBufferSize(), IID_PPV_ARGS(&globelGpuAnimationLocalToWorldPrefix3RootParam));
+
+        //merge
         CD3DX12_DESCRIPTOR_RANGE1 rangesMerge[6];
         //gAnimationInfoBuffer
         rangesMerge[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC_WHILE_SET_AT_EXECUTE);

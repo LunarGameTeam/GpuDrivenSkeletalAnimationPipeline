@@ -31,7 +31,8 @@ enum class GpuSimulationType
     SimulationSamuel = 0,
     SimulationKiyavash,
     SimulationOur,
-    SimulationOur2
+    SimulationOur2,
+    SimulationOur3
 };
 class SkeletalMeshRenderBatch
 {
