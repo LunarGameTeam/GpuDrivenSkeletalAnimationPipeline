@@ -407,6 +407,71 @@ void SkeletalMeshRenderBatch::CollectSkeletonHierarchyData2(std::vector<int32_t>
 
     }
 }
+uint32_t generateUintFromBinaryOnes(const std::vector<uint32_t>& onesPositions) {
+    uint32_t result = 0;
+    for (int pos : onesPositions) {
+        assert(pos >= 0 && pos <= 31);
+        result |= (1 << (pos));
+    }
+    return result;
+}
+void SkeletalMeshRenderBatch::CollectSkeletonHierarchyData4(std::vector<uint32_t>& skeletonMessagePack)
+{
+    laneParentOffset = skeletonMessagePack.size();
+    auto& curBoneTree = mSkeletalMeshPointer->mSkeleton.mBoneTree;
+    uint32_t boneCount = curBoneTree.size();
+    uint32_t alignedJointNum = SizeAligned2Pow((uint32_t)(boneCount), JointNumAligned);
+    uint32_t commandCount = alignedJointNum / JointNumAligned;
+    for (uint32_t commandId = 0; commandId < commandCount; ++commandId)
+    {
+        for (uint32_t jointId = 0; jointId < JointNumAligned; ++jointId)
+        {
+            skeletonMessagePack.push_back(0);
+            skeletonMessagePack.push_back(-1);
+        }
+    }
+    std::vector<std::vector<uint32_t>> parentList;
+    parentList.resize(boneCount);
+    for (uint32_t curJointId = 0; curJointId < curBoneTree.size(); ++curJointId)
+    {
+        uint32_t curFilterId = curJointId;
+        while (true)
+        {
+            SimpleSkeletonJoint& eachJoint = curBoneTree[curFilterId];
+            if (eachJoint.mParentIndex == int32_t(-1))
+            {
+                break;
+            }
+            parentList[curJointId].push_back(eachJoint.mParentIndex);
+            curFilterId = eachJoint.mParentIndex;
+        }
+    }
+    for (uint32_t curJointId = 0; curJointId < curBoneTree.size(); ++curJointId)
+    {
+        std::vector<uint32_t> blockLaneParentList;
+        auto& curParentList = parentList[curJointId];
+        uint32_t curCommandCount = curJointId / JointNumAligned;
+        uint32_t curLane = curJointId / JointNumLane;
+        for (uint32_t eachParent : curParentList)
+        {
+            if (eachParent < curLane * JointNumLane)
+            {
+                continue;
+            }
+            blockLaneParentList.push_back(eachParent - curLane * JointNumLane);
+        }
+        blockLaneParentList.push_back(curJointId - curLane * JointNumLane);
+        uint32_t curBit = generateUintFromBinaryOnes(blockLaneParentList);
+        skeletonMessagePack[curJointId * 2] = curBit;
+        for (uint32_t eachParent : curParentList)
+        {
+            if (eachParent < curLane * JointNumLane && eachParent >= curCommandCount * JointNumAligned)
+            {
+                skeletonMessagePack[curJointId * 2 + 1] = eachParent - curCommandCount * JointNumAligned;
+            }
+        }
+    }
+}
 
 void SkeletalMeshRenderBatch::CollectSkeletonHierarchyData(std::vector<SkeletonParentIdLayer>& skeletonMessagePack)
 {
@@ -510,6 +575,21 @@ void SkeletalMeshRenderBatch::CollectLocalToWorldUniformMessage(int32_t index, s
             }
             globelBlockOffset += curCommandCount;
         }
+    }
+}
+
+void SkeletalMeshRenderBatch::CollectLocalToWorldUniform4Message(std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelBlockOffset)
+{
+    int32_t curCommandCount = ComputeAssetAlignedSkeletalBlockCount();
+    for (auto eachInstanceId = 0; eachInstanceId < mAllInstance.size(); ++eachInstanceId)
+    {
+        DirectX::XMUINT4 commandUniform;
+        commandUniform.x = mSkeletonParentDataGlobelOffset[0];
+        commandUniform.y = curCommandCount;
+        commandUniform.z = globelBlockOffset;
+        commandUniform.w = 0;
+        globelBlockOffset += curCommandCount;
+        skeletonMessagePack.push_back(commandUniform);
     }
 }
 
@@ -711,6 +791,7 @@ void GpuSkeletonTreeLocalToWorld::CreateOnCmdListOpen(std::vector<SkeletalMeshRe
         meshValueList[meshIndex].CollectSkeletonParentData(skeletonParentPack);
         meshValueList[meshIndex].CollectSkeletonHierarchyData(skeletonMessagePack);
         meshValueList[meshIndex].CollectSkeletonHierarchyData2(skeletonParentPrefixPack2);
+        meshValueList[meshIndex].CollectSkeletonHierarchyData4(skeletonParentPrefixPack4);
         meshValueList[meshIndex].CollectLeafNodeMessage(leafBlockCount, leafParentMessage);
         allSkeletalBlockCount += meshValueList[meshIndex].ComputeAlignedSkeletalBlockCount();
     }
@@ -729,6 +810,7 @@ void GpuSkeletonTreeLocalToWorld::CreateOnCmdListOpen(std::vector<SkeletalMeshRe
     jointKiyavashAlgorithmMessage.Create((leafParentFullData.size() + 1024) * sizeof(int32_t), sizeof(int32_t));
     jointPrefixMessage.Create((skeletonMessagePack[0].mParentIdData.size() + 1024) * sizeof(int32_t), sizeof(int32_t));
     jointMergeInput.Create((skeletonMessagePack[1].mParentIdData.size() + 1024) * sizeof(int32_t), sizeof(int32_t));
+    jointPrefixMessage4.Create((skeletonParentPrefixPack4.size() + 1024) * sizeof(int32_t), sizeof(int32_t));
     trieStagingBuffer.Create(
         (
         skeletonMessagePack[0].mParentIdData.size()
@@ -736,6 +818,7 @@ void GpuSkeletonTreeLocalToWorld::CreateOnCmdListOpen(std::vector<SkeletalMeshRe
         + skeletonParentPack.size()
         + skeletonParentPrefixPack2.size()
         + leafParentFullData.size()
+        + skeletonParentPrefixPack4.size()
         + 1024
         ) * sizeof(int32_t)
     );
@@ -747,26 +830,32 @@ void GpuSkeletonTreeLocalToWorld::CreateOnCmdListOpen(std::vector<SkeletalMeshRe
     size_t jointMergeBufferSize = skeletonMessagePack[1].mParentIdData.size() * sizeof(int32_t);
     size_t jointPrefix2BufferSize = skeletonParentPrefixPack2.size() * sizeof(int32_t);
     size_t jointKiyavashAlgorithmBufferSize = leafParentFullData.size() * sizeof(int32_t);
+    size_t jointPrefix4BufferSize = skeletonParentPrefixPack4.size() * sizeof(uint32_t);
 
     memcpy(trieStagingBuffer.mapPointer, skeletonMessagePack[0].mParentIdData.data(), jointPrefixBufferSize);
     memcpy(trieStagingBuffer.mapPointer + jointPrefixBufferSize, skeletonMessagePack[1].mParentIdData.data(), jointMergeBufferSize);
     memcpy(trieStagingBuffer.mapPointer + jointPrefixBufferSize + jointMergeBufferSize, skeletonParentPack.data(), jointParentBufferSize);
     memcpy(trieStagingBuffer.mapPointer + jointPrefixBufferSize + jointMergeBufferSize + jointParentBufferSize, skeletonParentPrefixPack2.data(), jointPrefix2BufferSize);
     memcpy(trieStagingBuffer.mapPointer + jointPrefixBufferSize + jointMergeBufferSize + jointParentBufferSize + jointPrefix2BufferSize, leafParentFullData.data(), jointKiyavashAlgorithmBufferSize);
+    memcpy(trieStagingBuffer.mapPointer + jointPrefixBufferSize + jointMergeBufferSize + jointParentBufferSize + jointPrefix2BufferSize + jointKiyavashAlgorithmBufferSize, skeletonParentPrefixPack4.data(), jointPrefix4BufferSize);
 
     g_pd3dCommandList->CopyBufferRegion(jointPrefixMessage.mBufferResource.Get(), 0, trieStagingBuffer.mBufferResource.Get(), 0, jointPrefixBufferSize);
     g_pd3dCommandList->CopyBufferRegion(jointMergeInput.mBufferResource.Get(), 0, trieStagingBuffer.mBufferResource.Get(), jointPrefixBufferSize, jointMergeBufferSize);
     g_pd3dCommandList->CopyBufferRegion(jointSamuelAlgorithmMessage.mBufferResource.Get(), 0, trieStagingBuffer.mBufferResource.Get(), jointPrefixBufferSize + jointMergeBufferSize, jointParentBufferSize);
     g_pd3dCommandList->CopyBufferRegion(jointPrefixMessage2.mBufferResource.Get(), 0, trieStagingBuffer.mBufferResource.Get(), jointPrefixBufferSize + jointMergeBufferSize + jointParentBufferSize, jointPrefix2BufferSize);
     g_pd3dCommandList->CopyBufferRegion(jointKiyavashAlgorithmMessage.mBufferResource.Get(), 0, trieStagingBuffer.mBufferResource.Get(), jointPrefixBufferSize + jointMergeBufferSize + jointParentBufferSize + jointPrefix2BufferSize, jointKiyavashAlgorithmBufferSize);
+    g_pd3dCommandList->CopyBufferRegion(jointPrefixMessage4.mBufferResource.Get(), 0, trieStagingBuffer.mBufferResource.Get(), jointPrefixBufferSize + jointMergeBufferSize + jointParentBufferSize + jointPrefix2BufferSize + jointKiyavashAlgorithmBufferSize, jointPrefix4BufferSize);
 
-    D3D12_RESOURCE_BARRIER meshBufferBarrier[5];
-    meshBufferBarrier[0] = CD3DX12_RESOURCE_BARRIER::Transition(jointPrefixMessage.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    meshBufferBarrier[1] = CD3DX12_RESOURCE_BARRIER::Transition(jointMergeInput.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    meshBufferBarrier[2] = CD3DX12_RESOURCE_BARRIER::Transition(jointSamuelAlgorithmMessage.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    meshBufferBarrier[3] = CD3DX12_RESOURCE_BARRIER::Transition(jointPrefixMessage2.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    meshBufferBarrier[4] = CD3DX12_RESOURCE_BARRIER::Transition(jointKiyavashAlgorithmMessage.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    g_pd3dCommandList->ResourceBarrier(5, meshBufferBarrier);
+    D3D12_RESOURCE_BARRIER meshBufferBarrier[] =
+    {
+        CD3DX12_RESOURCE_BARRIER::Transition(jointPrefixMessage.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(jointMergeInput.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(jointSamuelAlgorithmMessage.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(jointPrefixMessage2.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(jointKiyavashAlgorithmMessage.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+        CD3DX12_RESOURCE_BARRIER::Transition(jointPrefixMessage4.mBufferResource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+    };
+    g_pd3dCommandList->ResourceBarrier(6, meshBufferBarrier);
     int a = 0;
 }
 
@@ -788,6 +877,10 @@ void GpuSkeletonTreeLocalToWorld::OnUpdate(GpuSimulationType curGpuType,std::vec
         if (curGpuType == GpuSimulationType::SimulationKiyavash)
         {
             meshValueList[meshIndex].CollectLocalToWorldUniformMessageOnlyLeaf(mergeOffsetPack, globelLeafBlockOffset,globelBlockOffset);
+        }
+        else if (curGpuType == GpuSimulationType::SimulationOur4)
+        {
+            meshValueList[meshIndex].CollectLocalToWorldUniform4Message(mergeOffsetPack, globelBlockOffset);
         }
         else
         {
@@ -961,6 +1054,26 @@ void GpuSkeletonTreeLocalToWorld::OnDispatch(
         g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationLocalToWorldMergePipeline.Get());
         g_pd3dCommandList->Dispatch(dispathcCount[1], 1, 1);
     }
+    else if (curGpuType == GpuSimulationType::SimulationOur4)
+    {
+        //prefix Pass
+        D3D12_RESOURCE_BARRIER gpuAnimationLocalToWorldPrefixBarrier[] =
+        {
+            CD3DX12_RESOURCE_BARRIER::Transition(animationResultOutput.mBufferResource.Get(),D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE),
+            CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap0.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS),
+            CD3DX12_RESOURCE_BARRIER::Transition(worldSpaceSkeletonResultMap1.mBufferResource.Get(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS)
+        };
+        g_pd3dCommandList->ResourceBarrier(3, gpuAnimationLocalToWorldPrefixBarrier);
+        g_pd3dCommandList->SetComputeRootSignature(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefix4RootParam.Get());
+        GpuResourceUtil::BindDescriptorToPipelineCS(0, animationResultOutput.mDescriptorOffsetSRV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(1, jointPrefixMessage2.mDescriptorOffsetSRV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(2, jointMergeInput.mDescriptorOffsetSRV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(3, prefixUniformGpu.mDescriptorOffsetSRV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(4, mergeUniformGpu.mDescriptorOffsetSRV);
+        GpuResourceUtil::BindDescriptorToPipelineCS(5, worldSpaceSkeletonResultMap1.mDescriptorOffsetUAV);
+        g_pd3dCommandList->SetPipelineState(allPepelines.GpuAnimationLocalToWorldPrefix4Pipeline.Get());
+        g_pd3dCommandList->Dispatch(dispathcCount[1], 1, 1);
+    }
 }
 
 void GpuAnimPoseGen::CreateOnCmdListOpen(std::vector<SkeletalMeshRenderBatch>& meshValueList)
@@ -1085,7 +1198,7 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
 void AnimationSimulateDemo::Create()
 {
     curType = SimulationType::SimulationGpu;
-    curGpuType = GpuSimulationType::SimulationOur2;
+    curGpuType = GpuSimulationType::SimulationOur4;
     D3D12_SAMPLER_DESC curSampler = {};
     curSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     curSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE::D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -1115,6 +1228,7 @@ void AnimationSimulateDemo::Create()
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldPrefixPipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_prefix.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefix2RootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldPrefix2Pipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_prefix2.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefix3RootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldPrefix3Pipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_prefix3.hlsl");
+    GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefix4RootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldPrefix4Pipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_prefix4.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldSamuelPipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_samuel.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldPrefixRootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldKiyavashPipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_kiyavash.hlsl");
     GpuResourceUtil::GenerateComputeShaderPipeline(GpuResourceUtil::globelGpuAnimationLocalToWorldMergeRootParam.Get(), mAllPipelines.GpuAnimationLocalToWorldMergePipeline, L"demo_asset_data/shader/animation_simulation/local_to_world_merge.hlsl");

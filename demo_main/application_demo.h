@@ -2,6 +2,7 @@
 #include"sky_box.h"
 #include"gpu_resource_helper.h"
 #define JointNumAligned 64
+#define JointNumLane 32
 struct MeshRenderParameter
 {
     DirectX::XMFLOAT4X4 mTransformMatrix;
@@ -32,7 +33,8 @@ enum class GpuSimulationType
     SimulationKiyavash,
     SimulationOur,
     SimulationOur2,
-    SimulationOur3
+    SimulationOur3,
+    SimulationOur4
 };
 class SkeletalMeshRenderBatch
 {
@@ -56,6 +58,8 @@ class SkeletalMeshRenderBatch
     //Leaf layer
     size_t mLeafLayerCount = 0;
     size_t mLeafLayerOffset = 0;
+    //lane offset
+    uint32_t laneParentOffset = 0;
 public:
     void CreateOnCmdListOpen(
         const int32_t meshIndex,
@@ -100,9 +104,13 @@ public:
 
     void CollectSkeletonHierarchyData2(std::vector<int32_t>& skeletonMessagePack);
 
+    void CollectSkeletonHierarchyData4(std::vector<uint32_t>& skeletonMessagePack);
+
     void CollectSkeletonHierarchyData(std::vector<SkeletonParentIdLayer>& skeletonMessagePack);
 
     void CollectLocalToWorldUniformMessage(int32_t index,std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelBlockOffset);
+
+    void CollectLocalToWorldUniform4Message(std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelBlockOffset);
 
     void CollectLocalToWorldUniformMessageOnlyLeaf(std::vector<DirectX::XMUINT4>& skeletonMessagePack, int32_t& globelLeafBlockOffset, int32_t& globelBlockOffset);
 
@@ -155,6 +163,7 @@ struct GpuSkeletonTreeLocalToWorld
 {
     std::vector<int32_t> skeletonParentPack;
     std::vector<int32_t> skeletonParentPrefixPack2;
+    std::vector<uint32_t> skeletonParentPrefixPack4;
     std::vector<SkeletonParentIdLayer> skeletonMessagePack;
 
     int32_t leafBlockCount;
@@ -172,6 +181,7 @@ struct GpuSkeletonTreeLocalToWorld
 
     SimpleReadOnlyBuffer jointPrefixMessage;
     SimpleReadOnlyBuffer jointPrefixMessage2;
+    SimpleReadOnlyBuffer jointPrefixMessage4;
     SimpleReadOnlyBuffer jointMergeInput;
     //save the world space skeleton joint pose
     SimpleReadWriteBuffer worldSpaceSkeletonResultMap0;

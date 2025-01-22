@@ -15,6 +15,8 @@ namespace GpuResourceUtil
 
     extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefix3RootParam;
 
+    extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldPrefix4RootParam;
+
     extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationLocalToWorldMergeRootParam;
 
     extern Microsoft::WRL::ComPtr<ID3D12RootSignature> globelGpuAnimationPoseGenRootParam;
@@ -81,6 +83,7 @@ namespace GpuResourceUtil
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldPrefixPipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldPrefix2Pipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldPrefix3Pipeline;
+        Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldPrefix4Pipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldSamuelPipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldKiyavashPipeline;
         Microsoft::WRL::ComPtr<ID3D12PipelineState> GpuAnimationLocalToWorldMergePipeline;

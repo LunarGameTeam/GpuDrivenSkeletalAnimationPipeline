@@ -2,11 +2,11 @@
 	"MeshModelList":
 	[
 		{
-			"MeshFileName":"demo_asset_data/skeletal_mesh_demo/runman/complex_human_run.lskelmesh",
-			"SkeletonFileName":"demo_asset_data/skeletal_mesh_demo/runman/complex_human_run.lskeleton",
+			"MeshFileName":"demo_asset_data/skeletal_mesh_demo/treetest320/tree_test_320.lskelmesh",
+			"SkeletonFileName":"demo_asset_data/skeletal_mesh_demo/treetest320/tree_test_320.lskeleton",
 			"AnimationFileList":
 			[
-				"demo_asset_data/skeletal_mesh_demo/runman/complex_human_run.lskelanimclip"
+				"demo_asset_data/skeletal_mesh_demo/treetest320/tree_test_320.lskelanimclip"
 			]
 		}
 	]

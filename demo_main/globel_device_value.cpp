@@ -60,10 +60,11 @@ bool CreateDeviceD3D(HWND hWnd)
         pdx12Debug->EnableDebugLayer();
 #endif
     // Create device
-    D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
+    D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_12_2;
     if (D3D12CreateDevice(nullptr, featureLevel, IID_PPV_ARGS(&g_pd3dDevice)) != S_OK)
         return false;
-
+    D3D12_FEATURE_DATA_D3D12_OPTIONS1 optionsDesc;
+    g_pd3dDevice->CheckFeatureSupport(D3D12_FEATURE::D3D12_FEATURE_D3D12_OPTIONS1,&optionsDesc,sizeof(optionsDesc));
     // [DEBUG] Setup debug interface to break on any warnings/errors
 #if defined(_DEBUG)
     if (pdx12Debug != nullptr)
