@@ -1,14 +1,12 @@
 StructuredBuffer<float4x4> LocalPoseDataBuffer : register(t0);
 StructuredBuffer<int> gParentPointBuffer : register(t1);
 StructuredBuffer<int> gParentPoint2Buffer : register(t2);
-StructuredBuffer<uint4> instanceUniformBuffer : register(t3);//{x:boneIDoffset,y:parentIDOffset}
 StructuredBuffer<uint4> objectUniformBuffer : register(t4);//{x:boneIDoffset,y:parentIDOffset}
 RWStructuredBuffer<float4x4> PoseDataBufferOut : register(u5);
 #ifndef MaxBoneCount
-#define MaxBoneCount 256
+#define MaxBoneCount 320
 #endif
 groupshared float4x4 tempMatrixMulResult0[MaxBoneCount];
-groupshared float4x4 tempMatrixMulResult1[MaxBoneCount];
 static const uint AlignedJointNum = 64;
 
 [numthreads(MaxBoneCount, 1, 1)]
@@ -25,47 +23,61 @@ void CSMain(
 	uint curGid64Rel = GTid.x / AlignedJointNum;
 	uint curGid64 = groupOffset + curGid64Rel;
 
-	//if (GTid.x < groupCount * AlignedJointNum)
-	uint curMatSamplePos = groupOffset * AlignedJointNum + GTid.x;
-	float4x4 curPoseMatrix = LocalPoseDataBuffer[curMatSamplePos];
-
-	uint curBlockOffset = curGid64Rel * AlignedJointNum;
-	uint curBoneId = GTid.x;
-	uint parentFindBegin = objectUniform.x * AlignedJointNum;
-	uint curParentDataOffset = (parentFindBegin + curBoneId) * 21;
-	uint curPoseGlobelBegin = curGid64 * AlignedJointNum;
-	for (int i = 0; i < 7; ++i)
+	uint curMatSamplePos = 0;
+	float4x4 curPoseMatrix = 0;
+	uint curBlockOffset = 0;
+	uint curBoneId =0;
+	uint parentFindBegin = 0;
+	uint curParentDataOffset = 0;
+	if (GTid.x < groupCount * AlignedJointNum)
 	{
-		int curParentId = gParentPointBuffer[curParentDataOffset + i] - curBlockOffset;
-		if (curParentId < 0)
+		curMatSamplePos = groupOffset * AlignedJointNum + GTid.x;
+		curPoseMatrix = LocalPoseDataBuffer[curMatSamplePos];
+
+		curBlockOffset = curGid64Rel * AlignedJointNum;
+		curBoneId = GTid.x;
+		parentFindBegin = objectUniform.x * AlignedJointNum;
+		curParentDataOffset = (parentFindBegin + curBoneId) * 21;
+		uint curPoseGlobelBegin = curGid64 * AlignedJointNum;
+		for (int i = 0; i < 7; ++i)
 		{
-			break;
+			int curParentId = gParentPointBuffer[curParentDataOffset + i] - curBlockOffset;
+			if (curParentId < 0)
+			{
+				break;
+			}
+			curPoseMatrix = mul(LocalPoseDataBuffer[curPoseGlobelBegin + curParentId], curPoseMatrix);
 		}
-		curPoseMatrix = mul(LocalPoseDataBuffer[curPoseGlobelBegin + curParentId], curPoseMatrix);
+		tempMatrixMulResult0[GTid.x] = curPoseMatrix;
 	}
-	tempMatrixMulResult0[GTid.x] = curPoseMatrix;
-
 	GroupMemoryBarrierWithGroupSync();
-
-	for (int i = 0; i < 7; ++i)
+	if (GTid.x < groupCount * AlignedJointNum)
 	{
-		int curParentId = gParentPointBuffer[curParentDataOffset + 7 + i] - curBlockOffset;
-		if (curParentId < 0)
+		for (int i = 0; i < 7; ++i)
 		{
-			break;
+			int curParentId = gParentPointBuffer[curParentDataOffset + 7 + i] - curBlockOffset;
+			if (curParentId < 0)
+			{
+				break;
+			}
+			curPoseMatrix = mul(tempMatrixMulResult0[curBlockOffset + curParentId], curPoseMatrix);
 		}
-		curPoseMatrix = mul(tempMatrixMulResult0[curBlockOffset + curParentId], curPoseMatrix);
 	}
-	tempMatrixMulResult1[GTid.x] = curPoseMatrix;
-
 	GroupMemoryBarrierWithGroupSync();
-
-	uint instanceBoneSampleBegin = groupOffset * AlignedJointNum;
-	int cur_bone_parent = gParentPoint2Buffer[parentFindBegin + curBoneId];
-	while (cur_bone_parent >= 0)
+	if (GTid.x < groupCount * AlignedJointNum)
 	{
-		curPoseMatrix = mul(tempMatrixMulResult1[cur_bone_parent], curPoseMatrix);
-		cur_bone_parent = gParentPoint2Buffer[parentFindBegin + cur_bone_parent];
+		tempMatrixMulResult0[GTid.x] = curPoseMatrix;
 	}
-	PoseDataBufferOut[curMatSamplePos] = curPoseMatrix;
+	GroupMemoryBarrierWithGroupSync();
+	if (GTid.x < groupCount * AlignedJointNum)
+	{
+		uint instanceBoneSampleBegin = groupOffset * AlignedJointNum;
+		int cur_bone_parent = gParentPoint2Buffer[parentFindBegin + curBoneId];
+		while (cur_bone_parent >= 0)
+		{
+			curPoseMatrix = mul(tempMatrixMulResult0[cur_bone_parent], curPoseMatrix);
+			cur_bone_parent = gParentPoint2Buffer[parentFindBegin + cur_bone_parent];
+		}
+		PoseDataBufferOut[curMatSamplePos] = curPoseMatrix;
+	}
 }

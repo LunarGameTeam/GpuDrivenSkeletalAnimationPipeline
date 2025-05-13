@@ -1,0 +1,69 @@
+{
+	"MeshModelList":
+	[
+		{
+			"Size": 0.1,
+			"MeshFileName": "demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskelmesh",
+			"SkeletonFileName": "demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskeleton",
+			"AnimationFileList": [
+				"demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskelanimclip"
+			]
+		},
+		{
+			"Size": 0.1,
+			"MeshFileName": "demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelmesh",
+			"SkeletonFileName": "demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskeleton",
+			"AnimationFileList": [
+				"demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelanimclip"
+			]
+		},
+		{
+			"Size": 0.1,
+			"MeshFileName": "demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelmesh",
+			"SkeletonFileName": "demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskeleton",
+			"AnimationFileList": [
+				"demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelanimclip"
+			]
+		},
+		{
+			"Size": 0.1,
+			"MeshFileName": "demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskelmesh",
+			"SkeletonFileName": "demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskeleton",
+			"AnimationFileList": [
+				"demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskelanimclip"
+			]
+		},
+		{
+			"Size": 0.1,
+			"MeshFileName": "demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelmesh",
+			"SkeletonFileName": "demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskeleton",
+			"AnimationFileList": [
+				"demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelanimclip"
+			]
+		},
+		{
+			"Size": 0.1,
+			"MeshFileName": "demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelmesh",
+			"SkeletonFileName": "demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskeleton",
+			"AnimationFileList": [
+				"demo_asset_data/skeletal_mesh_demo/dragon1/dragon1.lskelanimclip"
+			]
+		},
+		{
+			"Size": 0.1,
+			"MeshFileName": "demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskelmesh",
+			"SkeletonFileName": "demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskeleton",
+			"AnimationFileList": [
+				"demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskelanimclip"
+			]
+		},
+		{
+			"Size": 0.1,
+			"MeshFileName": "demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskelmesh",
+			"SkeletonFileName": "demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskeleton",
+			"AnimationFileList": [
+				"demo_asset_data/skeletal_mesh_demo/dragon2/dragon2.lskelanimclip"
+			]
+		}
+	]
+}

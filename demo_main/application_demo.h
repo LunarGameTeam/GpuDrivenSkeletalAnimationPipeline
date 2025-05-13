@@ -61,6 +61,7 @@ class SkeletalMeshRenderBatch
     //lane offset
     uint32_t laneParentOffset = 0;
 public:
+    float ModelSize = 1;
     void CreateOnCmdListOpen(
         const int32_t meshIndex,
         const std::string& meshFile,

@@ -1,0 +1,13 @@
+{
+	"MeshModelList":
+	[
+		{
+			"MeshFileName":"demo_asset_data/skeletal_mesh_demo/weedingtree/weeping_final.lskelmesh",
+			"SkeletonFileName":"demo_asset_data/skeletal_mesh_demo/weedingtree/weeping_final.lskeleton",
+			"AnimationFileList":
+			[
+				"demo_asset_data/skeletal_mesh_demo/weedingtree/weeping_final.lskelanimclip"
+			]
+		}
+	]
+}

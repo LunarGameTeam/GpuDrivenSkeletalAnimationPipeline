@@ -7,12 +7,20 @@ using json = nlohmann::json;
 DirectX::XMFLOAT4X4 MatrixCompose(DirectX::XMFLOAT4 position, DirectX::XMFLOAT4 rotation, DirectX::XMFLOAT4 scale)
 {
     DirectX::XMFLOAT4X4 composeMatrix;
-    DirectX::XMVECTOR quatIdentity = DirectX::XMQuaternionIdentity();
+    DirectX::XMVECTOR quatIdentity = DirectX::XMLoadFloat4(&rotation);
     DirectX::XMVECTOR positionVec, scaleVec;
     positionVec = DirectX::XMLoadFloat4(&position);
     scaleVec = DirectX::XMLoadFloat4(&scale);
     DirectX::XMMATRIX matOut;
     matOut = DirectX::XMMatrixAffineTransformation(scaleVec, quatIdentity, quatIdentity, positionVec);
+    DirectX::XMStoreFloat4x4(&composeMatrix, DirectX::XMMatrixTranspose(matOut));
+    return composeMatrix;
+}
+DirectX::XMFLOAT4X4 MatrixCompose(DirectX::XMFLOAT4 position, float rotationY, DirectX::XMFLOAT4 scale)
+{
+    DirectX::XMMATRIX matOut;
+    matOut = DirectX::XMMatrixScaling(scale.x, scale.y, scale.z) * DirectX::XMMatrixRotationY(rotationY) * DirectX::XMMatrixTranslation(position.x, position.y, position.z);
+    DirectX::XMFLOAT4X4 composeMatrix;
     DirectX::XMStoreFloat4x4(&composeMatrix, DirectX::XMMatrixTranspose(matOut));
     return composeMatrix;
 }
@@ -60,11 +68,11 @@ void SkeletalMeshRenderBatch::CreateOnCmdListOpen(
 {
     for (int32_t i = 0; i < 100; ++i)
     {
-        for (int32_t j = 0; j < 100; ++j)
+        for (int32_t j = 0; j < 10; ++j)
         {
-            float rand_time = 0;
+            float rand_time = rand() % 1000;
             rand_time /= 1000.0f;
-            AddInstance(MatrixCompose(DirectX::XMFLOAT4(i, 1, 2 * j, 1), DirectX::XMFLOAT4(0, 0, 0, 1), DirectX::XMFLOAT4(1, 1, 1, 1)), 0, rand_time);
+            AddInstance(MatrixCompose(DirectX::XMFLOAT4(i * 3 + meshIndex, 1, 2 * j, 1), rand_time * DirectX::XM_2PI, DirectX::XMFLOAT4(ModelSize, ModelSize, ModelSize, 1)), 0, rand_time);
         }
     }
     mRenderer.CreateOnCmdListOpen(meshFile, skeletonFile, animationFileList, materialName);
@@ -1152,6 +1160,11 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
         std::string curMeshName = curMesh["MeshFileName"];
         std::string curSkeletonName = curMesh["SkeletonFileName"];
         json curAnimationList = curMesh["AnimationFileList"];
+        float sizeMesh = 1;
+        if (curMesh.find("Size") != curMesh.end())
+        {
+            sizeMesh = curMesh["Size"];
+        }
         std::vector<std::string> animationNameList;
         int allAnimationCount = curAnimationList.size();
         for (int32_t animIndex = 0; animIndex < allAnimationCount; ++animIndex)
@@ -1159,6 +1172,7 @@ void AnimationSimulateDemo::CreateOnCmdListOpen(const std::string& configFile)
             std::string curAnimationName = curAnimationList[animIndex];
             animationNameList.push_back(curAnimationName);
         }
+        meshValueList[meshIndex].ModelSize = sizeMesh;
         meshValueList[meshIndex].CreateOnCmdListOpen(meshIndex,curMeshName, curSkeletonName, animationNameList, "demo_asset_data/skeletal_mesh_demo/lion3/lion3.material");
         allMeshVertexBufferSize += meshValueList[meshIndex].ComputeSkinResultBufferCount();
         //allSkeletalBufferSize += meshValueList[meshIndex].ComputeSkeletalMatrixBufferCount();
